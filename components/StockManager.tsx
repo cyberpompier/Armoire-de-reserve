@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../src/types';
+import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
 import { Search, Plus, User as UserIcon, History, ScanLine, X, QrCode } from 'lucide-react';
 import { ScannerAI } from './ScannerAI';
 import { BarcodeScanner } from './BarcodeScanner';
@@ -527,7 +527,7 @@ const PackageIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/200
 function getIconForType(type: EquipmentType) {
   // Simple mapping to abstract icons or lucide icons
   switch (type) {
-    case EquipmentType.HELMET: return <span className="text-xl">⛑️</span>;case EquipmentType.TROUSERS: return <span className="text-xl">👖</span>;
+    case EquipmentType.HELMET: return <span className="text-xl">⛑️</span>;
     case EquipmentType.JACKET: return <span className="text-xl">🧥</span>;
     case EquipmentType.BOOTS: return <span className="text-xl">👢</span>;
     case EquipmentType.GLOVES: return <span className="text-xl">🧤</span>;

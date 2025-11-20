@@ -1,11 +1,11 @@
-export enum EquipmentType {
-  HELMET = 'Casque F1',
-  JACKET = 'Veste de feu',
-  TROUSERS = 'Surpantalon',
-  BOOTS = 'Rangers',
-  GLOVES = 'Gants d\'attaque',
-  BELT = 'Ceinturon',
-  HOOD = 'Cagoule'
+export interface User {
+  id: string;
+  name: string;
+  rank: string;
+  email?: string;
+  matricule?: string;
+  caserne?: string;
+  role?: 'ADMIN' | 'USER';
 }
 
 export enum EquipmentStatus {
@@ -13,6 +13,15 @@ export enum EquipmentStatus {
   LOANED = 'Emprunté',
   DAMAGED = 'Hors service',
   MAINTENANCE = 'En maintenance'
+}
+
+export enum EquipmentType {
+  HELMET = 'Casque F1',
+  JACKET = 'Veste de feu',
+  TROUSERS = 'Surpantalon',
+  BOOTS = 'Rangers',
+  GLOVES = 'Gants d\'attaque',
+  BAG = 'Sac de transport'
 }
 
 export interface Equipment {
@@ -27,13 +36,6 @@ export interface Equipment {
   imageUrl?: string;
 }
 
-export interface User {
-  id: string;
-  matricule: string;
-  rank: string; // Grade
-  name: string;
-}
-
 export interface Transaction {
   id: string;
   equipmentId: string;
@@ -41,6 +43,8 @@ export interface Transaction {
   type: 'OUT' | 'IN';
   timestamp: number;
   notes?: string;
+  reason?: string;
+  note?: string; // Alias for backward compatibility or unification
 }
 
 export interface AppState {
