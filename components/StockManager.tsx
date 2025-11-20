@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
-import { Search, Filter, Plus, ArrowRightLeft, User as UserIcon, CheckCircle, AlertTriangle, History, Clock, ScanLine, X, QrCode } from 'lucide-react';
+import { Search, Plus, User as UserIcon, History, ScanLine, X, QrCode } from 'lucide-react';
 import { ScannerAI } from './ScannerAI';
 import { BarcodeScanner } from './BarcodeScanner';
 
 interface StockManagerProps {
   state: AppState;
+  currentUser: User | null;
   onAddEquipment: (eq: Equipment) => void;
   onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
 }
 
-export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipment, onTransaction }) => {
+export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onTransaction }) => {
   const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const [showScanner, setShowScanner] = useState(false); // AI Scanner
@@ -27,6 +28,13 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const [newItemSize, setNewItemSize] = useState('L');
   const [newItemCondition, setNewItemCondition] = useState('Neuf');
   const [newItemBarcode, setNewItemBarcode] = useState('');
+
+  // Set default user when opening modal
+  useEffect(() => {
+    if (showActionModal && currentUser) {
+      setSelectedUser(currentUser.id);
+    }
+  }, [showActionModal, currentUser]);
 
   // Filter logic
   const filteredItems = state.inventory.filter(item => {
@@ -89,11 +97,8 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
       setLoanReason('Intervention');
       setShowActionModal(true);
     } else {
-      // Item not found: Maybe propose to add it?
-      // For now, just alert (could be improved to open Add Modal with prefilled barcode)
       alert(`Équipement introuvable avec le code : ${code}`);
       setShowBarcodeScanner(false);
-      // Optional: Pre-fill search
       setSearch(code);
     }
   };
@@ -116,7 +121,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const handleAction = (action: 'LOAN' | 'RETURN') => {
     if (!selectedItem) return;
 
-    // Cast to any to allow adding 'note' and 'reason' property without modifying the global type definition immediately
     const transaction: any = {
       id: Date.now().toString(),
       equipmentId: selectedItem.id,
@@ -131,7 +135,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
     onTransaction(transaction, newStatus, action === 'LOAN' ? selectedUser : undefined);
     setShowActionModal(false);
     setSelectedItem(null);
-    setSelectedUser('');
     setNote('');
     setLoanReason('Intervention');
   };
@@ -378,16 +381,30 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Attribuer à :</label>
-                    <select 
-                      className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
-                      value={selectedUser}
-                      onChange={e => setSelectedUser(e.target.value)}
-                    >
-                      <option value="">Sélectionner un pompier</option>
-                      {state.users.map(u => (
-                        <option key={u.id} value={u.id}>{u.matricule} - {u.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select 
+                        className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
+                        value={selectedUser}
+                        onChange={e => setSelectedUser(e.target.value)}
+                      >
+                        <option value="">Sélectionner...</option>
+                        {/* Current User Option First */}
+                        {currentUser && (
+                          <option value={currentUser.id} className="font-bold">
+                             👉 MOI ({currentUser.rank} {currentUser.name})
+                          </option>
+                        )}
+                        <option disabled>──────────────────</option>
+                        {state.users
+                          .filter(u => u.id !== currentUser?.id)
+                          .map(u => (
+                            <option key={u.id} value={u.id}>{u.rank} {u.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <UserIcon className="w-4 h-4 text-slate-400" />
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
@@ -418,7 +435,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                       <p className="text-sm text-blue-800">
                         Actuellement attribué à : <br/>
                         <span className="font-bold text-lg">
-                          {state.users.find(u => u.id === selectedItem.assignedTo)?.name}
+                          {state.users.find(u => u.id === selectedItem.assignedTo)?.name || 'Utilisateur inconnu'}
                         </span>
                       </p>
                   </div>

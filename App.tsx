@@ -27,23 +27,58 @@ const INITIAL_STATE: AppState = {
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
 
   // Auth Session Management
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-    });
+      if (session) fetchUserProfile(session.user.id);
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
+      if (session) fetchUserProfile(session.user.id);
+      else setCurrentUser(null);
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Fetch user profile and add to state if not exists
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (data && !error) {
+        const userProfile: User = {
+          id: userId,
+          matricule: data.matricule || 'N/A',
+          name: `${data.prenom || ''} ${data.nom || ''}`.trim() || 'Utilisateur',
+          rank: data.grade || 'Sapeur'
+        };
+
+        setCurrentUser(userProfile);
+
+        // Add to global users list if not present (for history display)
+        setState(prev => {
+          if (prev.users.find(u => u.id === userId)) return prev;
+          return { ...prev, users: [...prev.users, userProfile] };
+        });
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  };
 
   // Load from local storage on mount
   useEffect(() => {
@@ -89,12 +124,12 @@ const App: React.FC = () => {
       <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
         
         {/* Content Area - Scrolls Independently */}
-        {/* flex-1 makes it take all available space above the footer */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
           {activeTab === 'stock' && (
             <StockManager 
               state={state} 
+              currentUser={currentUser}
               onAddEquipment={handleAddEquipment}
               onTransaction={handleTransaction}
             />
