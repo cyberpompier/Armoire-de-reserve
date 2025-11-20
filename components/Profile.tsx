@@ -1,19 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { User } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo } from 'lucide-react';
+
+interface UserProfile {
+  nom: string | null;
+  prenom: string | null;
+  avatar: string | null;
+  matricule: string | null;
+  email: string | null;
+}
 
 export const Profile = () => {
   const [user, setUser] = useState<User | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      setLoading(false);
+    const getProfileData = async () => {
+      try {
+        // 1. Récupérer l'utilisateur authentifié
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+
+        if (user) {
+          // 2. Récupérer les détails depuis la table 'profiles'
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('nom, prenom, avatar, matricule, email')
+            .eq('id', user.id)
+            .single();
+
+          if (error) {
+            console.warn('Profil non trouvé ou erreur:', error.message);
+          } else {
+            setProfile(data);
+          }
+        }
+      } catch (err) {
+        console.error('Erreur inattendue:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    getUser();
+    getProfileData();
   }, []);
 
   const handleSignOut = async () => {
@@ -24,6 +54,11 @@ export const Profile = () => {
     return <div className="p-8 text-center text-slate-400">Chargement...</div>;
   }
 
+  // Construction du nom d'affichage
+  const displayName = profile?.prenom || profile?.nom 
+    ? `${profile.prenom || ''} ${profile.nom || ''}`.trim() 
+    : 'Utilisateur';
+
   return (
     <div className="p-6 pb-24 animate-fade-in">
        <header className="mb-8">
@@ -32,13 +67,32 @@ export const Profile = () => {
        </header>
 
        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-             <UserIcon className="w-10 h-10" />
-          </div>
-          <h2 className="font-bold text-lg text-slate-800 mb-1">Utilisateur</h2>
-          <div className="flex items-center gap-1.5 text-slate-500 text-sm bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-             <Mail className="w-3 h-3" />
-             {user?.email}
+          {profile?.avatar ? (
+            <img 
+              src={profile.avatar} 
+              alt="Avatar" 
+              className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-slate-50 shadow-sm"
+            />
+          ) : (
+            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
+               <UserIcon className="w-10 h-10" />
+            </div>
+          )}
+          
+          <h2 className="font-bold text-lg text-slate-800 mb-1 capitalize">{displayName}</h2>
+          
+          <div className="flex flex-col gap-2 items-center mt-1">
+            <div className="flex items-center gap-1.5 text-slate-500 text-xs bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+               <Mail className="w-3 h-3" />
+               {profile?.email || user?.email}
+            </div>
+            
+            {profile?.matricule && (
+              <div className="flex items-center gap-1.5 text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-100 font-medium">
+                <BadgeInfo className="w-3 h-3" />
+                {profile.matricule}
+              </div>
+            )}
           </div>
        </div>
 
@@ -62,7 +116,7 @@ export const Profile = () => {
                </div>
                <div className="text-left">
                  <p className="text-sm font-bold text-slate-700">Modifier mes informations</p>
-                 <p className="text-xs text-slate-500">Nom, Grade, Matricule</p>
+                 <p className="text-xs text-slate-500">Nom, Prénom, Avatar</p>
                </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-300" />
