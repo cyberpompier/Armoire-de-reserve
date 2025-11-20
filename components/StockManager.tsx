@@ -37,7 +37,32 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
     return matchesFilter && matchesSearch;
   });
 
+  // Sound Feedback
+  const playBeep = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = 'sine';
+      osc.frequency.value = 1000; // 1000Hz beep
+      gain.gain.value = 0.1; // Volume bas
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15); // 150ms duration
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
+  };
+
   const handleAiIdentify = (type: EquipmentType, condition: string) => {
+    playBeep();
     // Create new item from scan
     const newItem: Equipment = {
       id: Date.now().toString(),
@@ -56,6 +81,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
     const foundItem = state.inventory.find(item => item.barcode === code);
     
     if (foundItem) {
+      playBeep();
       // Item found: Open action modal directly
       setShowBarcodeScanner(false);
       setSelectedItem(foundItem);
