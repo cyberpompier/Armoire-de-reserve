@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { User } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star } from 'lucide-react';
 
 interface UserProfile {
   nom: string | null;
@@ -9,6 +9,7 @@ interface UserProfile {
   avatar: string | null;
   matricule: string | null;
   email: string | null;
+  grade: string | null;
 }
 
 export const Profile = () => {
@@ -27,7 +28,7 @@ export const Profile = () => {
           // 2. Récupérer les détails depuis la table 'profiles'
           const { data, error } = await supabase
             .from('profiles')
-            .select('nom, prenom, avatar, matricule, email')
+            .select('nom, prenom, avatar, matricule, email, grade')
             .eq('id', user.id)
             .single();
 
@@ -82,6 +83,13 @@ export const Profile = () => {
           <h2 className="font-bold text-lg text-slate-800 mb-1 capitalize">{displayName}</h2>
           
           <div className="flex flex-col gap-2 items-center mt-1">
+             {profile?.grade && (
+              <div className="flex items-center gap-1.5 text-amber-600 text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-100 font-bold uppercase tracking-wide">
+                <Star className="w-3 h-3 fill-amber-600" />
+                {profile.grade}
+              </div>
+            )}
+
             <div className="flex items-center gap-1.5 text-slate-500 text-xs bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                <Mail className="w-3 h-3" />
                {profile?.email || user?.email}
@@ -116,7 +124,7 @@ export const Profile = () => {
                </div>
                <div className="text-left">
                  <p className="text-sm font-bold text-slate-700">Modifier mes informations</p>
-                 <p className="text-xs text-slate-500">Nom, Prénom, Avatar</p>
+                 <p className="text-xs text-slate-500">Nom, Grade, Matricule</p>
                </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-300" />
