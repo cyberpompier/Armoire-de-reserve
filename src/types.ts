@@ -19,7 +19,7 @@ export enum EquipmentType {
   JACKET = 'Veste textile',
   TROUSERS = 'Surpantalon textile',
   BOOTS = 'Bottes',
-  GLOVES = 'Gants',
+  GLOVES = 'Gants d'attaque',
   BAG = 'Sac de transport',
 }
 
