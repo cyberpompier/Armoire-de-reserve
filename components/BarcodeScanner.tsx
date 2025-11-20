@@ -22,20 +22,23 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
         
         if (!isMounted) return;
 
-        // Start decoding
-        codeReader.current.decodeFromVideoDevice(
-          undefined, 
-          videoRef.current!, 
-          (result, err) => {
-            if (result && isMounted) {
-              onScan(result.getText());
+        if (videoRef.current) {
+          // Start decoding
+          // Fix: Pass null instead of undefined for deviceId to match strict type signature (string | null)
+          codeReader.current.decodeFromVideoDevice(
+            null, 
+            videoRef.current, 
+            (result, err) => {
+              if (result && isMounted) {
+                onScan(result.getText());
+              }
+              if (err && !(err instanceof NotFoundException)) {
+                // Ignore NotFoundException which happens every frame no code is detected
+                console.warn(err);
+              }
             }
-            if (err && !(err instanceof NotFoundException)) {
-              // Ignore NotFoundException which happens every frame no code is detected
-              console.warn(err);
-            }
-          }
-        );
+          );
+        }
       } catch (err) {
         console.error("Camera error:", err);
         if (isMounted) {
