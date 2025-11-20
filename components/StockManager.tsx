@@ -22,6 +22,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const [newItemType, setNewItemType] = useState<EquipmentType>(EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState('L');
   const [newItemCondition, setNewItemCondition] = useState('Neuf');
+  const [newItemBarcode, setNewItemBarcode] = useState('');
 
   // Filter logic
   const filteredItems = state.inventory.filter(item => {
@@ -51,13 +52,14 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
       id: Date.now().toString(),
       type: newItemType,
       size: newItemSize,
-      barcode: `MAN-${Date.now().toString().slice(-6)}`,
+      barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
       status: EquipmentStatus.AVAILABLE,
       condition: newItemCondition as any,
       imageUrl: `https://picsum.photos/200?random=${Date.now()}`
     };
     onAddEquipment(newItem);
     setShowAddModal(false);
+    setNewItemBarcode('');
   };
 
   const handleAction = (action: 'LOAN' | 'RETURN') => {
@@ -216,6 +218,16 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
               </div>
 
               <div className="space-y-3">
+                <div>
+                   <label className="block text-xs font-medium text-slate-500 mb-1">Code Barre / Identifiant</label>
+                   <input 
+                     type="text"
+                     value={newItemBarcode}
+                     onChange={(e) => setNewItemBarcode(e.target.value)}
+                     placeholder="Ex: CAS-001 (Laisser vide pour auto)"
+                     className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono placeholder:font-sans"
+                   />
+                </div>
                 <div>
                    <label className="block text-xs font-medium text-slate-500 mb-1">Type d'équipement</label>
                    <select 
