@@ -31,7 +31,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   };
 
   return (
-    <div className="p-4 pb-6 space-y-6 animate-fade-in">
+    <div className="p-4 pb-24 space-y-6 animate-fade-in">
       <header className="flex justify-between items-center mb-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Tableau de Bord</h1>

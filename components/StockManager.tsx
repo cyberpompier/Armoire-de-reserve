@@ -67,7 +67,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   };
 
   return (
-    <div className="pb-6 animate-fade-in">
+    <div className="pb-24 animate-fade-in">
       {showScanner && (
         <ScannerAI 
           onClose={() => setShowScanner(false)} 
