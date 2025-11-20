@@ -1,0 +1,7 @@
+{
+  "name": "FireStock PWA",
+  "description": "Application de gestion des stocks d'EPI (Équipements de Protection Individuelle) pour Sapeurs-Pompiers avec assistance IA.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
