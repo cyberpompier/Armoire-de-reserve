@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
+import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../src/types';
 import { Search, Plus, User as UserIcon, History, ScanLine, X, QrCode } from 'lucide-react';
 import { ScannerAI } from './ScannerAI';
 import { BarcodeScanner } from './BarcodeScanner';
@@ -531,6 +531,7 @@ function getIconForType(type: EquipmentType) {
     case EquipmentType.JACKET: return <span className="text-xl">🧥</span>;
     case EquipmentType.BOOTS: return <span className="text-xl">👢</span>;
     case EquipmentType.GLOVES: return <span className="text-xl">🧤</span>;
+    case EquipmentType.BAG: return <span className="text-xl">🎒</span>;
     default: return <span className="text-xl">📦</span>;
   }
 }
