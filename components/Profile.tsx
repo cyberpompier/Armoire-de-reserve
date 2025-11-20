@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { User } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2 } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2 } from 'lucide-react';
 
 interface UserProfile {
   nom: string | null;
@@ -10,6 +10,7 @@ interface UserProfile {
   matricule: string | null;
   email: string | null;
   grade: string | null;
+  caserne: string | null;
 }
 
 export const Profile = () => {
@@ -25,7 +26,8 @@ export const Profile = () => {
     avatar: '',
     matricule: '',
     email: '',
-    grade: ''
+    grade: '',
+    caserne: ''
   });
   const [saving, setSaving] = useState(false);
 
@@ -38,7 +40,7 @@ export const Profile = () => {
         if (user) {
           const { data, error } = await supabase
             .from('profiles')
-            .select('nom, prenom, avatar, matricule, email, grade')
+            .select('nom, prenom, avatar, matricule, email, grade, caserne')
             .eq('id', user.id)
             .single();
 
@@ -46,7 +48,7 @@ export const Profile = () => {
             console.warn('Profil non trouvé ou erreur:', error.message);
           } else {
             setProfile(data);
-            setFormData(data); // Initialiser le formulaire avec les données existantes
+            setFormData(data);
           }
         }
       } catch (err) {
@@ -76,6 +78,7 @@ export const Profile = () => {
         prenom: formData.prenom,
         matricule: formData.matricule,
         grade: formData.grade,
+        caserne: formData.caserne,
         updated_at: new Date().toISOString(),
       };
 
@@ -126,7 +129,7 @@ export const Profile = () => {
           
           <h2 className="font-bold text-lg text-slate-800 mb-1 capitalize">{displayName}</h2>
           
-          <div className="flex flex-col gap-2 items-center mt-1">
+          <div className="flex flex-col gap-2 items-center mt-1 w-full">
              {profile?.grade && (
               <div className="flex items-center gap-1.5 text-amber-600 text-xs bg-amber-50 px-3 py-1 rounded-full border border-amber-100 font-bold uppercase tracking-wide">
                 <Star className="w-3 h-3 fill-amber-600" />
@@ -139,12 +142,20 @@ export const Profile = () => {
                {profile?.email || user?.email}
             </div>
             
-            {profile?.matricule && (
-              <div className="flex items-center gap-1.5 text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-100 font-medium">
-                <BadgeInfo className="w-3 h-3" />
-                {profile.matricule}
-              </div>
-            )}
+            <div className="flex gap-2 justify-center w-full flex-wrap">
+              {profile?.matricule && (
+                <div className="flex items-center gap-1.5 text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-100 font-medium">
+                  <BadgeInfo className="w-3 h-3" />
+                  {profile.matricule}
+                </div>
+              )}
+              {profile?.caserne && (
+                <div className="flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-3 py-1 rounded-full border border-slate-200 font-medium">
+                  <Building2 className="w-3 h-3" />
+                  {profile.caserne}
+                </div>
+              )}
+            </div>
           </div>
        </div>
 
@@ -171,7 +182,7 @@ export const Profile = () => {
                </div>
                <div className="text-left">
                  <p className="text-sm font-bold text-slate-700">Modifier mes informations</p>
-                 <p className="text-xs text-slate-500">Nom, Grade, Matricule</p>
+                 <p className="text-xs text-slate-500">Nom, Grade, Caserne...</p>
                </div>
             </div>
             <ChevronRight className="w-4 h-4 text-slate-300" />
@@ -238,6 +249,21 @@ export const Profile = () => {
                       className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono"
                     />
                     <BadgeInfo className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Caserne / Centre de Secours</label>
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      name="caserne"
+                      value={formData.caserne || ''}
+                      onChange={handleInputChange}
+                      placeholder="Ex: CS Centre"
+                      className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
+                    />
+                    <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   </div>
                 </div>
 
