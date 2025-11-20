@@ -1,4 +1,3 @@
-pb-6) pour harmoniser avec le nouveau layout.">
 import React, { useState } from 'react';
 import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
 import { Search, Filter, Plus, ArrowRightLeft, User as UserIcon, CheckCircle, AlertTriangle, History, Clock } from 'lucide-react';

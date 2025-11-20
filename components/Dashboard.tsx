@@ -1,4 +1,3 @@
-pb-6) car le footer ne se superpose plus.">
 import React, { useEffect, useState } from 'react';
 import { AppState, EquipmentStatus } from '../types';
 import { ShieldAlert, Package, Activity, Sparkles, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
