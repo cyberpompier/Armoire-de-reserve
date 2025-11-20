@@ -17,7 +17,7 @@ export enum EquipmentStatus {
 export enum EquipmentType {
   HELMET = 'Casque F1',
   JACKET = 'Veste textile',
-  TROUSERS = 'Pantalon textile',
+  TROUSERS = 'Surpantalon textile',
   BOOTS = 'Bottes',
   GLOVES = 'Gants',
   BAG = 'Sac de transport',
