@@ -41,6 +41,13 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
+      /* CRITICAL: Force full height for sticky footer layout */
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden; /* Prevent body scroll, only app container scrolls */
+      }
       body {
         background-color: #f8fafc;
         -webkit-tap-highlight-color: transparent;

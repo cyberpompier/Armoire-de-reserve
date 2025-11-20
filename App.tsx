@@ -59,12 +59,14 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-fire-200">
+    <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
       
-      {/* Main Content Area */}
-      <main className="max-w-md mx-auto min-h-screen bg-white shadow-2xl overflow-hidden relative">
+      {/* Main App Container - Fixed Full Height */}
+      <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
         
-        <div className="h-full overflow-y-auto no-scrollbar">
+        {/* Content Area - Scrolls Independently */}
+        {/* flex-1 makes it take all available space above the footer */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
           {activeTab === 'stock' && (
             <StockManager 
@@ -74,7 +76,7 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'settings' && (
-             <div className="p-6 flex flex-col items-center justify-center h-[80vh] text-slate-400">
+             <div className="p-6 flex flex-col items-center justify-center min-h-full text-slate-400">
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
                <p className="text-sm text-center mt-2">Configuration de la caserne et gestion des utilisateurs.</p>
@@ -88,8 +90,8 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Bottom Navigation Bar */}
-        <nav className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30">
+        {/* Fixed Footer - Stays at bottom because of flex layout */}
+        <nav className="shrink-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <button 
             onClick={() => setActiveTab('dashboard')}
             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
