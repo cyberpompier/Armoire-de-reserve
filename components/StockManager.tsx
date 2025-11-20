@@ -16,6 +16,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('');
+  const [note, setNote] = useState('');
 
   // New Item State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -65,12 +66,14 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const handleAction = (action: 'LOAN' | 'RETURN') => {
     if (!selectedItem) return;
 
-    const transaction: Transaction = {
+    // Cast to any to allow adding 'note' property without modifying the global type definition immediately
+    const transaction: any = {
       id: Date.now().toString(),
       equipmentId: selectedItem.id,
       userId: action === 'LOAN' ? selectedUser : (selectedItem.assignedTo || 'SYSTEM'),
       type: action === 'LOAN' ? 'OUT' : 'IN',
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      note: note.trim()
     };
 
     const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
@@ -78,6 +81,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
     setShowActionModal(false);
     setSelectedItem(null);
     setSelectedUser('');
+    setNote('');
   };
 
   // Helper to get history for selected item
@@ -147,7 +151,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
           filteredItems.map(item => (
             <div 
               key={item.id} 
-              onClick={() => { setSelectedItem(item); setShowActionModal(true); }}
+              onClick={() => { setSelectedItem(item); setShowActionModal(true); setNote(''); }}
               className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 active:scale-[0.99] transition-transform"
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
@@ -291,6 +295,17 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
 
             {/* Actions */}
             <div className="mb-8">
+              {/* Note field for all actions */}
+              <div className="mb-4">
+                <label className="block text-xs font-medium text-slate-500 mb-1.5">Note / Commentaire</label>
+                <textarea 
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Ajouter une note sur l'état ou l'opération..."
+                  className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 resize-none h-20"
+                />
+              </div>
+
               {selectedItem.status === EquipmentStatus.AVAILABLE && (
                 <div className="space-y-4">
                   <div>
@@ -353,7 +368,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                   {getSelectedItemHistory().length === 0 ? (
                     <p className="text-xs text-slate-400 italic">Aucun historique pour cet équipement.</p>
                   ) : (
-                    getSelectedItemHistory().map((t, idx) => {
+                    getSelectedItemHistory().map((t: any, idx) => {
                       const user = state.users.find(u => u.id === t.userId);
                       const date = new Date(t.timestamp);
                       return (
@@ -381,6 +396,11 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                               <p className="text-xs text-slate-500 mt-0.5">
                                 {date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})}
                               </p>
+                              {t.note && (
+                                <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded border border-slate-100 italic">
+                                  "{t.note}"
+                                </p>
+                              )}
                            </div>
                         </div>
                       );
