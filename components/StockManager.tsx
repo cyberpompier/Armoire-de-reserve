@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
-import { Search, Filter, Plus, ArrowRightLeft, User as UserIcon, CheckCircle, AlertTriangle, History, Clock, ScanLine, X } from 'lucide-react';
+import { Search, Filter, Plus, ArrowRightLeft, User as UserIcon, CheckCircle, AlertTriangle, History, Clock, ScanLine, X, QrCode } from 'lucide-react';
 import { ScannerAI } from './ScannerAI';
+import { BarcodeScanner } from './BarcodeScanner';
 
 interface StockManagerProps {
   state: AppState;
@@ -12,7 +13,8 @@ interface StockManagerProps {
 export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipment, onTransaction }) => {
   const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [showScanner, setShowScanner] = useState(false);
+  const [showScanner, setShowScanner] = useState(false); // AI Scanner
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false); // Barcode Scanner
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('');
@@ -47,6 +49,27 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
       imageUrl: `https://picsum.photos/200?random=${Date.now()}`
     };
     onAddEquipment(newItem);
+  };
+
+  const handleBarcodeFound = (code: string) => {
+    // Try to find item in inventory
+    const foundItem = state.inventory.find(item => item.barcode === code);
+    
+    if (foundItem) {
+      // Item found: Open action modal directly
+      setShowBarcodeScanner(false);
+      setSelectedItem(foundItem);
+      setNote('');
+      setLoanReason('Intervention');
+      setShowActionModal(true);
+    } else {
+      // Item not found: Maybe propose to add it?
+      // For now, just alert (could be improved to open Add Modal with prefilled barcode)
+      alert(`Équipement introuvable avec le code : ${code}`);
+      setShowBarcodeScanner(false);
+      // Optional: Pre-fill search
+      setSearch(code);
+    }
   };
 
   const handleManualAdd = () => {
@@ -104,6 +127,13 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
         />
       )}
 
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          onClose={() => setShowBarcodeScanner(false)}
+          onScan={handleBarcodeFound}
+        />
+      )}
+
       {/* Header Search */}
       <div className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 px-4 py-3 border-b border-slate-200">
         <div className="flex gap-2 mb-3">
@@ -117,6 +147,15 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
               onChange={e => setSearch(e.target.value)}
             />
           </div>
+          
+          {/* Barcode Scan Button */}
+          <button 
+            onClick={() => setShowBarcodeScanner(true)}
+            className="bg-white text-slate-700 p-2 rounded-xl border border-slate-200 shadow-sm active:scale-95 transition-transform"
+          >
+            <QrCode className="w-5 h-5" />
+          </button>
+
           <button 
             onClick={() => setShowAddModal(true)}
             className="bg-slate-900 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-transform"

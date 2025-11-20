@@ -14,6 +14,7 @@
     "@capacitor/core": "^7.4.4",
     "@capacitor/ios": "^7.4.4",
     "@google/genai": "^1.30.0",
+    "@zxing/library": "^0.21.3",
     "lucide-react": "^0.554.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
