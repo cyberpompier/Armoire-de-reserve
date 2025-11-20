@@ -82,14 +82,17 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                     {/* Current User Option First */}
                     {currentUser && (
                       <option value={currentUser.id} className="font-bold">
-                         👉 MOI ({currentUser.rank} {currentUser.name})
+                         👉 {currentUser.rank} {currentUser.name} (MOI)
                       </option>
                     )}
                     <option disabled>──────────────────</option>
                     {users
                       .filter(u => u.id !== currentUser?.id)
+                      .sort((a, b) => a.name.localeCompare(b.name)) // Tri alphabétique
                       .map(u => (
-                        <option key={u.id} value={u.id}>{u.rank} {u.name}</option>
+                        <option key={u.id} value={u.id}>
+                          {u.rank ? `${u.rank} ` : ''}{u.name}
+                        </option>
                     ))}
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">

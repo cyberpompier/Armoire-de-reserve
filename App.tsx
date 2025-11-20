@@ -8,7 +8,7 @@ import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-rea
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 
-// Mock Initial Data
+// Mock Initial Data (utilisé uniquement si pas de données)
 const INITIAL_STATE: AppState = {
   inventory: [
     { id: '1', type: EquipmentType.HELMET, size: 'M', barcode: 'CAS-001', status: EquipmentStatus.AVAILABLE, condition: 'Bon' },
@@ -17,11 +17,7 @@ const INITIAL_STATE: AppState = {
     { id: '4', type: EquipmentType.GLOVES, size: '9', barcode: 'GAN-007', status: EquipmentStatus.DAMAGED, condition: 'Critique' },
     { id: '5', type: EquipmentType.HELMET, size: 'L', barcode: 'CAS-005', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
   ],
-  users: [
-    { id: 'u1', matricule: 'SP-2934', name: 'Sgt. Dupont', rank: 'Sergent', role: 'USER' },
-    { id: 'u2', matricule: 'SP-1102', name: 'Cpl. Martin', rank: 'Caporal', role: 'USER' },
-    { id: 'u3', matricule: 'SP-4455', name: 'Sap. Leroy', rank: 'Sapeur', role: 'USER' },
-  ],
+  users: [],
   transactions: []
 };
 
@@ -36,21 +32,28 @@ const App: React.FC = () => {
     const initAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
-      if (session) fetchUserProfile(session.user.id);
+      if (session) {
+        await fetchUserProfile(session.user.id);
+        await fetchUsersDirectory(); // Récupérer tous les utilisateurs pour les listes
+      }
     };
 
     initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
-      if (session) fetchUserProfile(session.user.id);
-      else setCurrentUser(null);
+      if (session) {
+        await fetchUserProfile(session.user.id);
+        await fetchUsersDirectory();
+      } else {
+        setCurrentUser(null);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Fetch user profile and add to state if not exists
+  // Récupère le profil de l'utilisateur connecté
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -63,31 +66,42 @@ const App: React.FC = () => {
         const userProfile: User = {
           id: userId,
           matricule: data.matricule || 'N/A',
-          name: `${data.prenom || ''} ${data.nom || ''}`.trim() || 'Utilisateur',
+          name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur',
-          role: data.role || 'USER' // Récupère le rôle de la BDD ou défaut
+          role: data.role || 'USER'
         };
-
         setCurrentUser(userProfile);
-
-        // Add to global users list if not present (for history display)
-        setState(prev => {
-          if (prev.users.find(u => u.id === userId)) return prev;
-          return { ...prev, users: [...prev.users, userProfile] };
-        });
-      } else if (!data) {
-        // Fallback if profile doesn't exist yet but we have session
-        // This happens immediately after signup if trigger is slow or nonexistent
-        const fallbackUser: User = {
-            id: userId,
-            name: 'Nouvel Utilisateur',
-            rank: 'Sapeur',
-            role: 'USER'
-        };
-        setCurrentUser(fallbackUser);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
+    }
+  };
+
+  // Récupère TOUS les profils pour peupler les listes déroulantes
+  const fetchUsersDirectory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('nom', { ascending: true });
+
+      if (data && !error) {
+        const directory: User[] = data.map((p: any) => ({
+          id: p.id,
+          matricule: p.matricule || 'N/A',
+          // Formatage : NOM Prénom
+          name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
+          rank: p.grade || '',
+          role: p.role || 'USER'
+        }));
+
+        setState(prev => ({
+          ...prev,
+          users: directory
+        }));
+      }
+    } catch (e) {
+      console.error("Erreur chargement annuaire:", e);
     }
   };
 
@@ -95,7 +109,9 @@ const App: React.FC = () => {
   useEffect(() => {
     const saved = localStorage.getItem('firestock_state');
     if (saved) {
-      setState(JSON.parse(saved));
+      const parsed = JSON.parse(saved);
+      // On garde les users chargés depuis la BDD s'ils sont vides dans le storage
+      setState(prev => ({ ...parsed, users: prev.users.length ? prev.users : parsed.users }));
     }
   }, []);
 
@@ -121,7 +137,7 @@ const App: React.FC = () => {
       ...prev,
       inventory: [...prev.inventory, eq]
     }));
-    setActiveTab('stock'); // Switch to list to see new item
+    setActiveTab('stock');
   };
 
   if (!session) {
@@ -130,11 +146,7 @@ const App: React.FC = () => {
 
   return (
     <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
-      
-      {/* Main App Container - Fixed Full Height */}
       <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
-        
-        {/* Content Area - Scrolls Independently */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
           {activeTab === 'stock' && (
@@ -160,13 +172,12 @@ const App: React.FC = () => {
                 onClick={() => { localStorage.removeItem('firestock_state'); window.location.reload(); }}
                 className="mt-8 text-fire-600 text-sm underline"
                >
-                 Réinitialiser les données démo
+                 Réinitialiser cache local
                </button>
              </div>
           )}
         </div>
 
-        {/* Fixed Footer - Stays at bottom because of flex layout */}
         <nav className="shrink-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <button 
             onClick={() => setActiveTab('dashboard')}
@@ -210,26 +221,12 @@ const App: React.FC = () => {
         </nav>
 
       </main>
-
-      {/* Styles for animations */}
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes slide-up {
-          from { transform: translateY(100%); }
-          to { transform: translateY(0); }
-        }
-        .animate-fade-in {
-          animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .animate-slide-up {
-          animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .pb-safe {
-          padding-bottom: env(safe-area-inset-bottom, 20px);
-        }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        .animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
       `}</style>
     </div>
   );
