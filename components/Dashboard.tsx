@@ -96,10 +96,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                 const item = state.inventory.find(i => i.id === t.equipmentId);
                 const user = state.users.find(u => u.id === t.userId);
                 const date = new Date(t.timestamp);
+                const trans = t as any; // Access dynamic properties
                 
                 return (
-                  <div key={t.id} className="p-4 flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  <div key={t.id} className="p-4 flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 mt-1 ${
                       t.type === 'OUT' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'
                     }`}>
                       {t.type === 'OUT' ? <ArrowUpRight size={18} strokeWidth={2.5} /> : <ArrowDownLeft size={18} strokeWidth={2.5} />}
@@ -111,8 +112,22 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                       <p className="text-xs text-slate-500 truncate">
                         {user ? `${user.rank} ${user.name}` : 'Système'}
                       </p>
+                      
+                      {/* Display Reason */}
+                      {t.type === 'OUT' && trans.reason && (
+                        <span className="inline-block mt-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-600 font-medium">
+                           {trans.reason}
+                        </span>
+                      )}
+                      
+                      {/* Display Note */}
+                      {trans.note && (
+                        <p className="mt-1.5 text-xs text-slate-600 italic bg-slate-50 p-2 rounded border border-slate-100">
+                          "{trans.note}"
+                        </p>
+                      )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <p className="text-xs font-bold text-slate-700 font-mono">
                         {date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                       </p>
