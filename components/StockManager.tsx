@@ -527,7 +527,7 @@ const PackageIcon = (props: any) => <svg {...props} xmlns="http://www.w3.org/200
 function getIconForType(type: EquipmentType) {
   // Simple mapping to abstract icons or lucide icons
   switch (type) {
-    case EquipmentType.HELMET: return <span className="text-xl">⛑️</span>;case EquipmentType.HELMET: return <span className="text-xl">👖</span>;
+    case EquipmentType.HELMET: return <span className="text-xl">⛑️</span>;case EquipmentType.TROUSERS: return <span className="text-xl">👖</span>;
     case EquipmentType.JACKET: return <span className="text-xl">🧥</span>;
     case EquipmentType.BOOTS: return <span className="text-xl">👢</span>;
     case EquipmentType.GLOVES: return <span className="text-xl">🧤</span>;
