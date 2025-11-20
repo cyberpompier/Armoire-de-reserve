@@ -62,7 +62,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-fire-200">
       
       {/* Main Content Area */}
-      <main className="max-w-md mx-auto min-h-screen bg-white shadow-2xl overflow-hidden relative">
+      <main className="max-w-md mx-auto h-screen bg-white shadow-2xl overflow-hidden relative">
         
         <div className="h-full overflow-y-auto no-scrollbar">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
