@@ -1,3 +1,4 @@
+pb-6) pour harmoniser avec le nouveau layout.">
 import React, { useState } from 'react';
 import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
 import { Search, Filter, Plus, ArrowRightLeft, User as UserIcon, CheckCircle, AlertTriangle, History, Clock } from 'lucide-react';
@@ -67,7 +68,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   };
 
   return (
-    <div className="pb-24 animate-fade-in">
+    <div className="pb-6 animate-fade-in">
       {showScanner && (
         <ScannerAI 
           onClose={() => setShowScanner(false)} 

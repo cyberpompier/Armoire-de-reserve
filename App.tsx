@@ -62,7 +62,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-fire-200">
       
       {/* Main Content Area - Flex Column Layout */}
-      <main className="max-w-md mx-auto h-screen bg-white shadow-2xl overflow-hidden flex flex-col relative">
+      <main className="max-w-md mx-auto h-[100dvh] bg-white shadow-2xl overflow-hidden flex flex-col relative">
         
         {/* Scrollable Content Area (Takes all remaining space) */}
         <div className="flex-1 overflow-y-auto no-scrollbar relative">
@@ -89,8 +89,8 @@ const App: React.FC = () => {
           )}
         </div>
 
-        {/* Fixed Bottom Navigation Bar (No longer absolute) */}
-        <nav className="shrink-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30 w-full">
+        {/* Fixed Bottom Navigation Bar */}
+        <nav className="shrink-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
           <button 
             onClick={() => setActiveTab('dashboard')}
             className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
