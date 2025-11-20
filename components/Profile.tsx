@@ -46,6 +46,8 @@ export const Profile = () => {
 
           if (error) {
             console.warn('Profil non trouvé ou erreur:', error.message);
+            // Si pas de profil, on pré-remplit avec l'email de l'auth
+            setFormData(prev => ({ ...prev, email: user.email || '' }));
           } else {
             setProfile(data);
             setFormData(data);
@@ -74,26 +76,27 @@ export const Profile = () => {
     setSaving(true);
     try {
       const updates = {
+        id: user.id, // Requis pour upsert (création)
         nom: formData.nom,
         prenom: formData.prenom,
         matricule: formData.matricule,
         grade: formData.grade,
         caserne: formData.caserne,
+        email: user.email, // On s'assure que l'email est sauvegardé
         updated_at: new Date().toISOString(),
       };
 
       const { error } = await supabase
         .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
+        .upsert(updates);
 
       if (error) throw error;
 
-      setProfile({ ...formData, email: profile?.email || null, avatar: profile?.avatar || null });
+      setProfile({ ...formData, email: user.email || null, avatar: profile?.avatar || null });
       setIsEditing(false);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur lors de la mise à jour:', error);
-      alert('Erreur lors de la mise à jour du profil.');
+      alert('Erreur lors de la sauvegarde du profil : ' + error.message);
     } finally {
       setSaving(false);
     }
@@ -174,10 +177,10 @@ export const Profile = () => {
 
          <button 
             onClick={() => setIsEditing(true)}
-            className="w-full bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between active:scale-[0.99] transition-transform hover:bg-slate-50"
+            className="w-full bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-center gap-3 active:scale-[0.99] transition-transform hover:bg-slate-50 group"
          >
-            <div className="flex items-center gap-3">
-               <div className="p-2 bg-slate-50 text-slate-600 rounded-lg">
+            <div className="flex items-center gap-3 flex-1">
+               <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-slate-100 transition-colors">
                  <UserIcon className="w-5 h-5" />
                </div>
                <div className="text-left">
@@ -191,7 +194,7 @@ export const Profile = () => {
 
        <button 
          onClick={handleSignOut}
-         className="mt-8 w-full py-4 border border-red-100 bg-red-50 text-red-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
+         className="mt-8 w-full py-4 border border-red-100 bg-red-50 text-red-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform hover:bg-red-100"
        >
          <LogOut className="w-4 h-4" />
          Se déconnecter
@@ -292,10 +295,10 @@ export const Profile = () => {
                 <button 
                   onClick={handleSave}
                   disabled={saving}
-                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 mt-4 flex items-center justify-center gap-2 disabled:opacity-70"
+                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 mt-4 flex items-center justify-center gap-2 disabled:opacity-70 hover:bg-slate-800 transition-colors"
                 >
                   {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
-                  {saving ? 'Enregistrement...' : 'Enregistrer les modifications'}
+                  {saving ? 'Enregistrement...' : 'Enregistrer le profil'}
                 </button>
               </div>
             </div>
