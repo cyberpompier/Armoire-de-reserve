@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
-import { LayoutDashboard, PackageSearch, Settings } from 'lucide-react';
+import { Profile } from './components/Profile';
+import { Login } from './components/Login';
+import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
+import { supabase } from './supabaseClient';
+import { Session } from '@supabase/supabase-js';
 
 // Mock Initial Data
 const INITIAL_STATE: AppState = {
@@ -22,8 +26,24 @@ const INITIAL_STATE: AppState = {
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings'>('dashboard');
+  const [session, setSession] = useState<Session | null>(null);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+
+  // Auth Session Management
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   // Load from local storage on mount
   useEffect(() => {
@@ -58,6 +78,10 @@ const App: React.FC = () => {
     setActiveTab('stock'); // Switch to list to see new item
   };
 
+  if (!session) {
+    return <Login />;
+  }
+
   return (
     <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
       
@@ -75,11 +99,12 @@ const App: React.FC = () => {
               onTransaction={handleTransaction}
             />
           )}
+          {activeTab === 'profile' && <Profile />}
           {activeTab === 'settings' && (
              <div className="p-6 flex flex-col items-center justify-center min-h-full text-slate-400">
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
-               <p className="text-sm text-center mt-2">Configuration de la caserne et gestion des utilisateurs.</p>
+               <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
                <button 
                 onClick={() => { localStorage.removeItem('firestock_state'); window.location.reload(); }}
                 className="mt-8 text-fire-600 text-sm underline"
@@ -110,6 +135,16 @@ const App: React.FC = () => {
           >
             <PackageSearch className={`w-6 h-6 ${activeTab === 'stock' && 'fill-fire-100'}`} strokeWidth={activeTab === 'stock' ? 2.5 : 2} />
             <span className="text-[10px] font-medium">Stock</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('profile')}
+            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
+              activeTab === 'profile' ? 'text-fire-600 scale-105' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <UserCircle className={`w-6 h-6 ${activeTab === 'profile' && 'fill-current'}`} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
+            <span className="text-[10px] font-medium">Profil</span>
           </button>
 
           <button 
