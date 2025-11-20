@@ -17,6 +17,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const [showActionModal, setShowActionModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [note, setNote] = useState('');
+  const [loanReason, setLoanReason] = useState<string>('Intervention');
 
   // New Item State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -66,14 +67,15 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
   const handleAction = (action: 'LOAN' | 'RETURN') => {
     if (!selectedItem) return;
 
-    // Cast to any to allow adding 'note' property without modifying the global type definition immediately
+    // Cast to any to allow adding 'note' and 'reason' property without modifying the global type definition immediately
     const transaction: any = {
       id: Date.now().toString(),
       equipmentId: selectedItem.id,
       userId: action === 'LOAN' ? selectedUser : (selectedItem.assignedTo || 'SYSTEM'),
       type: action === 'LOAN' ? 'OUT' : 'IN',
       timestamp: Date.now(),
-      note: note.trim()
+      note: note.trim(),
+      reason: action === 'LOAN' ? loanReason : undefined
     };
 
     const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
@@ -82,6 +84,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
     setSelectedItem(null);
     setSelectedUser('');
     setNote('');
+    setLoanReason('Intervention');
   };
 
   // Helper to get history for selected item
@@ -151,7 +154,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
           filteredItems.map(item => (
             <div 
               key={item.id} 
-              onClick={() => { setSelectedItem(item); setShowActionModal(true); setNote(''); }}
+              onClick={() => { setSelectedItem(item); setShowActionModal(true); setNote(''); setLoanReason('Intervention'); }}
               className="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 active:scale-[0.99] transition-transform"
             >
               <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
@@ -321,6 +324,19 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
+                    <select 
+                      className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
+                      value={loanReason}
+                      onChange={e => setLoanReason(e.target.value)}
+                    >
+                      <option value="Intervention">Intervention</option>
+                      <option value="Entraînement">Entraînement / Manœuvre</option>
+                      <option value="Maintenance">Maintenance / Entretien</option>
+                      <option value="Autre">Autre</option>
+                    </select>
+                  </div>
                   <button 
                     onClick={() => handleAction('LOAN')}
                     disabled={!selectedUser}
@@ -393,9 +409,16 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, onAddEquipmen
                                   {date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
                                 </span>
                               </div>
-                              <p className="text-xs text-slate-500 mt-0.5">
-                                {date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})}
-                              </p>
+                              <div className="flex flex-wrap gap-2 items-center mt-0.5">
+                                <p className="text-xs text-slate-500">
+                                  {date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})}
+                                </p>
+                                {t.reason && (
+                                  <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                    {t.reason}
+                                  </span>
+                                )}
+                              </div>
                               {t.note && (
                                 <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded border border-slate-100 italic">
                                   "{t.note}"
