@@ -46,6 +46,9 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     .filter(t => t.equipmentId === item.id)
     .sort((a, b) => b.timestamp - a.timestamp);
 
+  // Check if admin
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">
       <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
@@ -77,28 +80,39 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                     className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
                     value={selectedUser}
                     onChange={e => setSelectedUser(e.target.value)}
+                    disabled={!isAdmin} // Désactiver le select si pas admin (optionnel, ou juste cacher les autres options)
                   >
-                    <option value="">Sélectionner...</option>
                     {/* Current User Option First */}
                     {currentUser && (
                       <option value={currentUser.id} className="font-bold">
                          👉 {currentUser.rank} {currentUser.name} (MOI)
                       </option>
                     )}
-                    <option disabled>──────────────────</option>
-                    {users
-                      .filter(u => u.id !== currentUser?.id)
-                      .sort((a, b) => a.name.localeCompare(b.name)) // Tri alphabétique
-                      .map(u => (
-                        <option key={u.id} value={u.id}>
-                          {u.rank ? `${u.rank} ` : ''}{u.name}
-                        </option>
-                    ))}
+                    
+                    {/* Show other users ONLY if ADMIN */}
+                    {isAdmin && (
+                      <>
+                        <option disabled>──────────────────</option>
+                        {users
+                          .filter(u => u.id !== currentUser?.id)
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.rank ? `${u.rank} ` : ''}{u.name}
+                            </option>
+                        ))}
+                      </>
+                    )}
                   </select>
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
                     <UserIcon className="w-4 h-4 text-slate-400" />
                   </div>
                 </div>
+                {!isAdmin && (
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                    * Seul un administrateur peut attribuer du matériel à un tiers.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
