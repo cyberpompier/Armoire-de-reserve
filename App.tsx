@@ -18,9 +18,9 @@ const INITIAL_STATE: AppState = {
     { id: '5', type: EquipmentType.HELMET, size: 'L', barcode: 'CAS-005', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
   ],
   users: [
-    { id: 'u1', matricule: 'SP-2934', name: 'Sgt. Dupont', rank: 'Sergent' },
-    { id: 'u2', matricule: 'SP-1102', name: 'Cpl. Martin', rank: 'Caporal' },
-    { id: 'u3', matricule: 'SP-4455', name: 'Sap. Leroy', rank: 'Sapeur' },
+    { id: 'u1', matricule: 'SP-2934', name: 'Sgt. Dupont', rank: 'Sergent', role: 'USER' },
+    { id: 'u2', matricule: 'SP-1102', name: 'Cpl. Martin', rank: 'Caporal', role: 'USER' },
+    { id: 'u3', matricule: 'SP-4455', name: 'Sap. Leroy', rank: 'Sapeur', role: 'USER' },
   ],
   transactions: []
 };
@@ -64,7 +64,8 @@ const App: React.FC = () => {
           id: userId,
           matricule: data.matricule || 'N/A',
           name: `${data.prenom || ''} ${data.nom || ''}`.trim() || 'Utilisateur',
-          rank: data.grade || 'Sapeur'
+          rank: data.grade || 'Sapeur',
+          role: data.role || 'USER' // Récupère le rôle de la BDD ou défaut
         };
 
         setCurrentUser(userProfile);
@@ -74,6 +75,16 @@ const App: React.FC = () => {
           if (prev.users.find(u => u.id === userId)) return prev;
           return { ...prev, users: [...prev.users, userProfile] };
         });
+      } else if (!data) {
+        // Fallback if profile doesn't exist yet but we have session
+        // This happens immediately after signup if trigger is slow or nonexistent
+        const fallbackUser: User = {
+            id: userId,
+            name: 'Nouvel Utilisateur',
+            rank: 'Sapeur',
+            role: 'USER'
+        };
+        setCurrentUser(fallbackUser);
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
@@ -140,6 +151,11 @@ const App: React.FC = () => {
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
                <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
+               {currentUser?.role === 'ADMIN' && (
+                 <div className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold">
+                    Panneau Administrateur Actif
+                 </div>
+               )}
                <button 
                 onClick={() => { localStorage.removeItem('firestock_state'); window.location.reload(); }}
                 className="mt-8 text-fire-600 text-sm underline"

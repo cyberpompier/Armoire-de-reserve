@@ -21,6 +21,11 @@ export const Login = () => {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            data: {
+              role: 'USER', // Attribution automatique du rôle
+            }
+          }
         });
         if (error) throw error;
         setMessage('Inscription réussie ! Vérifiez vos emails pour confirmer.');
