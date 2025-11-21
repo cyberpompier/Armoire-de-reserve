@@ -34,7 +34,7 @@ const App: React.FC = () => {
       setSession(session);
       if (session) {
         await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory();
+        await fetchUsersDirectory(); // Récupérer tous les utilisateurs pour les listes
       }
     };
 
@@ -53,6 +53,7 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Récupère le profil de l'utilisateur connecté
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -76,6 +77,7 @@ const App: React.FC = () => {
     }
   };
 
+  // Récupère TOUS les profils pour peupler les listes déroulantes
   const fetchUsersDirectory = async () => {
     try {
       const { data, error } = await supabase
@@ -87,6 +89,7 @@ const App: React.FC = () => {
         const directory: User[] = data.map((p: any) => ({
           id: p.id,
           matricule: p.matricule || 'N/A',
+          // Formatage : NOM Prénom
           name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
           rank: p.grade || '',
           role: p.role || 'pompier'
@@ -107,6 +110,7 @@ const App: React.FC = () => {
     const saved = localStorage.getItem('firestock_state');
     if (saved) {
       const parsed = JSON.parse(saved);
+      // On garde les users chargés depuis la BDD s'ils sont vides dans le storage
       setState(prev => ({ ...parsed, users: prev.users.length ? prev.users : parsed.users }));
     }
   }, []);
@@ -136,16 +140,6 @@ const App: React.FC = () => {
     setActiveTab('stock');
   };
 
-  // Mise à jour d'un équipement existant
-  const handleUpdateEquipment = (updatedItem: Equipment) => {
-    setState(prev => ({
-      ...prev,
-      inventory: prev.inventory.map(item => 
-        item.id === updatedItem.id ? updatedItem : item
-      )
-    }));
-  };
-
   if (!session) {
     return <Login />;
   }
@@ -161,7 +155,6 @@ const App: React.FC = () => {
               currentUser={currentUser}
               onAddEquipment={handleAddEquipment}
               onTransaction={handleTransaction}
-              onUpdateEquipment={handleUpdateEquipment}
             />
           )}
           {activeTab === 'profile' && <Profile />}

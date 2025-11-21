@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Equipment, EquipmentStatus, Transaction, User, EquipmentType } from '../types';
-import { History, User as UserIcon, Pencil, Check, X, Trash2 } from 'lucide-react';
+import { Equipment, EquipmentStatus, Transaction, User } from '../types';
+import { History, User as UserIcon, Pencil } from 'lucide-react';
 
 interface ActionModalProps {
   isOpen: boolean;
@@ -10,7 +10,7 @@ interface ActionModalProps {
   users: User[];
   transactions: Transaction[];
   onAction: (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => void;
-  onUpdate?: (item: Equipment) => void;
+  onEdit?: (item: Equipment) => void;
 }
 
 export const ActionModal: React.FC<ActionModalProps> = ({
@@ -21,17 +21,13 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   users,
   transactions,
   onAction,
-  onUpdate
+  onEdit
 }) => {
-  // Action State
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [note, setNote] = useState('');
   const [loanReason, setLoanReason] = useState<string>('Intervention');
-  
-  // Edit Mode State
-  const [isEditing, setIsEditing] = useState(false);
-  const [editForm, setEditForm] = useState<Partial<Equipment>>({});
 
+  // Set default user when opening
   useEffect(() => {
     if (isOpen && currentUser) {
       setSelectedUser(currentUser.id);
@@ -39,25 +35,12 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     // Reset fields
     setNote('');
     setLoanReason('Intervention');
-    setIsEditing(false);
-    if (item) {
-      setEditForm(item);
-    }
-  }, [isOpen, currentUser, item]);
+  }, [isOpen, currentUser]);
 
   if (!isOpen || !item) return null;
 
-  const handleConfirmAction = (action: 'LOAN' | 'RETURN') => {
+  const handleConfirm = (action: 'LOAN' | 'RETURN') => {
     onAction(action, selectedUser, loanReason, note);
-  };
-
-  const handleSaveEdit = () => {
-    if (onUpdate && editForm) {
-      // Merge updates with original item to ensure full object validity
-      const updatedItem = { ...item, ...editForm } as Equipment;
-      onUpdate(updatedItem);
-      setIsEditing(false);
-    }
   };
 
   // Get history for this item
@@ -65,7 +48,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     .filter(t => t.equipmentId === item.id)
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Check if admin
+  // Check if admin (lowercase)
   const isAdmin = currentUser?.role === 'admin';
 
   return (
@@ -74,286 +57,186 @@ export const ActionModal: React.FC<ActionModalProps> = ({
       <div className="bg-white w-full max-w-md rounded-t-3xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sticky top-0"></div>
         
-        {/* --- HEADER (View Mode vs Edit Mode) --- */}
         <div className="flex justify-between items-start mb-6">
-          <div className="flex-1">
-             {isEditing ? (
-               <input 
-                 type="text" 
-                 className="text-xl font-bold text-slate-900 mb-1 w-full border-b-2 border-fire-200 focus:border-fire-500 outline-none bg-transparent"
-                 value={editForm.barcode || ''}
-                 onChange={e => setEditForm({...editForm, barcode: e.target.value})}
-                 placeholder="Identifiant / Code-barres"
-               />
-             ) : (
-               <>
-                 <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
-                 <p className="text-slate-500 text-sm">ID: {item.barcode}</p>
-               </>
-             )}
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
+            <p className="text-slate-500 text-sm">ID: {item.barcode} • État: {item.condition}</p>
+          </div>
+          {isAdmin && (
+            <button 
+              onClick={() => onEdit?.(item)}
+              className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 active:scale-95 transition-all border border-slate-200"
+              title="Modifier l'équipement"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="mb-8">
+          {/* Note field for all actions */}
+          <div className="mb-4">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">Note / Commentaire</label>
+            <textarea 
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="Ajouter une note sur l'état ou l'opération..."
+              className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 resize-none h-20"
+            />
           </div>
 
-          {isAdmin && (
-            <div className="ml-4 flex gap-2">
-              {isEditing ? (
-                <>
-                   <button 
-                    onClick={() => setIsEditing(false)}
-                    className="p-2.5 bg-slate-100 text-slate-500 rounded-xl hover:bg-slate-200"
-                   >
-                     <X className="w-4 h-4" />
-                   </button>
-                   <button 
-                    onClick={handleSaveEdit}
-                    className="p-2.5 bg-fire-600 text-white rounded-xl hover:bg-fire-700 shadow-lg shadow-fire-200"
-                   >
-                     <Check className="w-4 h-4" />
-                   </button>
-                </>
-              ) : (
-                <button 
-                  onClick={() => setIsEditing(true)}
-                  className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 active:scale-95 transition-all border border-slate-200"
-                  title="Modifier l'équipement"
+          {item.status === EquipmentStatus.AVAILABLE && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Attribuer à :</label>
+                <div className="relative">
+                  <select 
+                    className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
+                    value={selectedUser}
+                    onChange={e => setSelectedUser(e.target.value)}
+                    disabled={!isAdmin} // Désactiver le select si pas admin
+                  >
+                    <option value="">Sélectionner...</option>
+                    {/* Current User Option First */}
+                    {currentUser && (
+                      <option value={currentUser.id} className="font-bold">
+                         👉 {currentUser.rank} {currentUser.name} (MOI)
+                      </option>
+                    )}
+                    
+                    {/* Show other users ONLY if ADMIN */}
+                    {isAdmin && (
+                      <>
+                        <option disabled>──────────────────</option>
+                        {users
+                          .filter(u => u.id !== currentUser?.id)
+                          .sort((a, b) => a.name.localeCompare(b.name))
+                          .map(u => (
+                            <option key={u.id} value={u.id}>
+                              {u.rank ? `${u.rank} ` : ''}{u.name}
+                            </option>
+                        ))}
+                      </>
+                    )}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <UserIcon className="w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
+                {!isAdmin && (
+                  <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                    * Seul un administrateur peut attribuer du matériel à un tiers.
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
+                <select 
+                  className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
+                  value={loanReason}
+                  onChange={e => setLoanReason(e.target.value)}
                 >
-                  <Pencil className="w-4 h-4" />
-                </button>
-              )}
+                  <option value="Intervention">Intervention</option>
+                  <option value="Entraînement">Entraînement / Manœuvre</option>
+                  <option value="Maintenance">Maintenance / Entretien</option>
+                  <option value="Autre">Autre</option>
+                </select>
+              </div>
+              <button 
+                onClick={() => handleConfirm('LOAN')}
+                disabled={!selectedUser}
+                className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-transform"
+              >
+                Valider la Sortie
+              </button>
+            </div>
+          )}
+
+          {item.status === EquipmentStatus.LOANED && (
+            <div className="space-y-4">
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                  <p className="text-sm text-blue-800">
+                    Actuellement attribué à : <br/>
+                    <span className="font-bold text-lg">
+                      {users.find(u => u.id === item.assignedTo)?.name || 'Utilisateur inconnu'}
+                    </span>
+                  </p>
+              </div>
+              <button 
+                onClick={() => handleConfirm('RETURN')}
+                className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
+              >
+                Confirmer le Retour
+              </button>
+            </div>
+          )}
+          
+          {item.status === EquipmentStatus.DAMAGED && (
+            <div className="p-4 bg-red-50 text-red-700 rounded-xl text-center font-medium">
+              Matériel hors service. Nécessite réparation ou remplacement.
             </div>
           )}
         </div>
 
-        {/* --- CONTENT --- */}
-        
-        {isEditing ? (
-          /* === EDIT FORM === */
-          <div className="space-y-4 mb-8 animate-fade-in">
-             <div>
-               <label className="block text-xs font-medium text-slate-500 mb-1.5">Type d'équipement</label>
-               <select 
-                 className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-fire-500"
-                 value={editForm.type}
-                 onChange={e => setEditForm({...editForm, type: e.target.value as EquipmentType})}
-               >
-                 {Object.values(EquipmentType).map(t => (
-                   <option key={t} value={t}>{t}</option>
-                 ))}
-               </select>
-             </div>
-
-             <div className="flex gap-4">
-               <div className="flex-1">
-                 <label className="block text-xs font-medium text-slate-500 mb-1.5">Taille</label>
-                 <input 
-                    type="text"
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-fire-500"
-                    value={editForm.size || ''}
-                    onChange={e => setEditForm({...editForm, size: e.target.value})}
-                 />
-               </div>
-               <div className="flex-1">
-                  <label className="block text-xs font-medium text-slate-500 mb-1.5">État général</label>
-                  <select 
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-fire-500"
-                    value={editForm.condition}
-                    onChange={e => setEditForm({...editForm, condition: e.target.value as any})}
-                  >
-                    <option value="Neuf">Neuf</option>
-                    <option value="Bon">Bon</option>
-                    <option value="Usé">Usé</option>
-                    <option value="Critique">Critique</option>
-                  </select>
-               </div>
-             </div>
-
-             <div>
-                <label className="block text-xs font-medium text-slate-500 mb-1.5">Statut technique</label>
-                <select 
-                  className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-fire-500"
-                  value={editForm.status}
-                  onChange={e => setEditForm({...editForm, status: e.target.value as EquipmentStatus})}
-                >
-                   <option value={EquipmentStatus.AVAILABLE}>Disponible</option>
-                   <option value={EquipmentStatus.DAMAGED}>Hors Service (HS)</option>
-                   <option value={EquipmentStatus.MAINTENANCE}>En Maintenance</option>
-                   <option value={EquipmentStatus.LOANED} disabled>Emprunté (Géré par action)</option>
-                </select>
-             </div>
-
-             <div className="pt-4 border-t border-slate-100">
-               <button className="w-full py-3 text-red-500 text-sm font-medium flex items-center justify-center gap-2 rounded-xl hover:bg-red-50 transition-colors">
-                 <Trash2 className="w-4 h-4" /> Supprimer cet équipement
-               </button>
-             </div>
-          </div>
-        ) : (
-          /* === VIEW & ACTIONS === */
-          <div className="mb-8 animate-fade-in">
-            <p className="text-slate-500 text-sm mb-6">État: {item.condition} • {item.status}</p>
-            
-            {/* Note field for all actions */}
-            <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-500 mb-1.5">Note / Commentaire</label>
-              <textarea 
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="Ajouter une note sur l'état ou l'opération..."
-                className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 resize-none h-20"
-              />
-            </div>
-
-            {item.status === EquipmentStatus.AVAILABLE && (
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Attribuer à :</label>
-                  <div className="relative">
-                    <select 
-                      className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
-                      value={selectedUser}
-                      onChange={e => setSelectedUser(e.target.value)}
-                      disabled={!isAdmin}
-                    >
-                      <option value="">Sélectionner...</option>
-                      {currentUser && (
-                        <option value={currentUser.id} className="font-bold">
-                          👉 {currentUser.rank} {currentUser.name} (MOI)
-                        </option>
-                      )}
-                      
-                      {isAdmin && (
-                        <>
-                          <option disabled>──────────────────</option>
-                          {users
-                            .filter(u => u.id !== currentUser?.id)
-                            .sort((a, b) => a.name.localeCompare(b.name))
-                            .map(u => (
-                              <option key={u.id} value={u.id}>
-                                {u.rank ? `${u.rank} ` : ''}{u.name}
-                              </option>
-                          ))}
-                        </>
-                      )}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <UserIcon className="w-4 h-4 text-slate-400" />
-                    </div>
-                  </div>
-                  {!isAdmin && (
-                    <p className="text-[10px] text-slate-400 mt-1 ml-1">
-                      * Seul un administrateur peut attribuer du matériel à un tiers.
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
-                  <select 
-                    className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
-                    value={loanReason}
-                    onChange={e => setLoanReason(e.target.value)}
-                  >
-                    <option value="Intervention">Intervention</option>
-                    <option value="Entraînement">Entraînement / Manœuvre</option>
-                    <option value="Maintenance">Maintenance / Entretien</option>
-                    <option value="Autre">Autre</option>
-                  </select>
-                </div>
-                <button 
-                  onClick={() => handleConfirmAction('LOAN')}
-                  disabled={!selectedUser}
-                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-transform"
-                >
-                  Valider la Sortie
-                </button>
-              </div>
-            )}
-
-            {item.status === EquipmentStatus.LOANED && (
-              <div className="space-y-4">
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                    <p className="text-sm text-blue-800">
-                      Actuellement attribué à : <br/>
-                      <span className="font-bold text-lg">
-                        {users.find(u => u.id === item.assignedTo)?.name || 'Utilisateur inconnu'}
-                      </span>
-                    </p>
-                </div>
-                <button 
-                  onClick={() => handleConfirmAction('RETURN')}
-                  className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
-                >
-                  Confirmer le Retour
-                </button>
-              </div>
-            )}
-            
-            {item.status === EquipmentStatus.DAMAGED && (
-              <div className="p-4 bg-red-50 text-red-700 rounded-xl text-center font-medium">
-                Matériel hors service. Nécessite réparation ou remplacement.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* History Section - Hide in Edit Mode for cleanliness */}
-        {!isEditing && (
-          <div className="border-t border-slate-100 pt-6">
-             <div className="flex items-center gap-2 mb-4">
-               <History className="w-4 h-4 text-slate-400" />
-               <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Traçabilité</h3>
-             </div>
-             
-             <div className="space-y-4 pl-2">
-                {itemHistory.length === 0 ? (
-                  <p className="text-xs text-slate-400 italic">Aucun historique pour cet équipement.</p>
-                ) : (
-                  itemHistory.map((t: any, idx) => {
-                    const user = users.find(u => u.id === t.userId);
-                    const date = new Date(t.timestamp);
-                    return (
-                      <div key={t.id} className="relative flex gap-4">
-                         {/* Timeline Line */}
-                         {idx !== itemHistory.length - 1 && (
-                           <div className="absolute left-[5px] top-3 bottom-[-16px] w-[2px] bg-slate-100"></div>
-                         )}
-                         
-                         <div className={`w-3 h-3 rounded-full mt-1.5 shrink-0 z-10 ring-4 ring-white ${
-                           t.type === 'OUT' ? 'bg-blue-500' : 'bg-green-500'
-                         }`}></div>
-                         
-                         <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <p className="text-sm font-medium text-slate-800">
-                                {t.type === 'OUT' ? 'Emprunté' : 'Restitué'}
-                                <span className="text-slate-500 font-normal"> par </span>
-                                {user ? user.name : 'Système'}
-                              </p>
-                              <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded">
-                                {date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+        {/* History Section */}
+        <div className="border-t border-slate-100 pt-6">
+           <div className="flex items-center gap-2 mb-4">
+             <History className="w-4 h-4 text-slate-400" />
+             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Traçabilité</h3>
+           </div>
+           
+           <div className="space-y-4 pl-2">
+              {itemHistory.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Aucun historique pour cet équipement.</p>
+              ) : (
+                itemHistory.map((t: any, idx) => {
+                  const user = users.find(u => u.id === t.userId);
+                  const date = new Date(t.timestamp);
+                  return (
+                    <div key={t.id} className="relative flex gap-4">
+                       {/* Timeline Line */}
+                       {idx !== itemHistory.length - 1 && (
+                         <div className="absolute left-[5px] top-3 bottom-[-16px] w-[2px] bg-slate-100"></div>
+                       )}
+                       
+                       <div className={`w-3 h-3 rounded-full mt-1.5 shrink-0 z-10 ring-4 ring-white ${
+                         t.type === 'OUT' ? 'bg-blue-500' : 'bg-green-500'
+                       }`}></div>
+                       
+                       <div className="flex-1">
+                          <div className="flex justify-between items-start">
+                            <p className="text-sm font-medium text-slate-800">
+                              {t.type === 'OUT' ? 'Emprunté' : 'Restitué'}
+                              <span className="text-slate-500 font-normal"> par </span>
+                              {user ? user.name : 'Système'}
+                            </p>
+                            <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 rounded">
+                              {date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 items-center mt-0.5">
+                            <p className="text-xs text-slate-500">
+                              {date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})}
+                            </p>
+                            {t.reason && (
+                              <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                {t.reason}
                               </span>
-                            </div>
-                            <div className="flex flex-wrap gap-2 items-center mt-0.5">
-                              <p className="text-xs text-slate-500">
-                                {date.toLocaleDateString('fr-FR', {weekday: 'long', day: 'numeric', month: 'long'})}
-                              </p>
-                              {t.reason && (
-                                <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  {t.reason}
-                                </span>
-                              )}
-                            </div>
-                            {t.note && (
-                              <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded border border-slate-100 italic">
-                                "{t.note}"
-                              </p>
                             )}
-                         </div>
-                      </div>
-                    );
-                  })
-                )}
-             </div>
-          </div>
-        )}
+                          </div>
+                          {t.note && (
+                            <p className="text-xs text-slate-600 mt-1 bg-slate-50 p-2 rounded border border-slate-100 italic">
+                              "{t.note}"
+                            </p>
+                          )}
+                       </div>
+                    </div>
+                  );
+                })
+              )}
+           </div>
+        </div>
 
       </div>
     </div>
