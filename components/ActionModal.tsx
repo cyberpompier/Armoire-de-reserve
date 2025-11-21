@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Equipment, EquipmentStatus, Transaction, User } from '../types';
-import { History, User as UserIcon } from 'lucide-react';
+import { Equipment, EquipmentStatus, EquipmentType, Transaction, User } from '../types';
+import { History, User as UserIcon, Pencil, Save, Trash2, X } from 'lucide-react';
 
 interface ActionModalProps {
   isOpen: boolean;
@@ -10,6 +10,8 @@ interface ActionModalProps {
   users: User[];
   transactions: Transaction[];
   onAction: (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => void;
+  onUpdate?: (eq: Equipment) => void;
+  onDelete?: (id: string) => void;
 }
 
 export const ActionModal: React.FC<ActionModalProps> = ({
@@ -19,11 +21,17 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   currentUser,
   users,
   transactions,
-  onAction
+  onAction,
+  onUpdate,
+  onDelete
 }) => {
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [note, setNote] = useState('');
   const [loanReason, setLoanReason] = useState<string>('Intervention');
+
+  // Edit Mode State
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Equipment>>({});
 
   // Set default user when opening
   useEffect(() => {
@@ -33,12 +41,33 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     // Reset fields
     setNote('');
     setLoanReason('Intervention');
-  }, [isOpen, currentUser]);
+    setIsEditing(false);
+    if (item) {
+      setEditForm({ ...item });
+    }
+  }, [isOpen, currentUser, item]);
 
   if (!isOpen || !item) return null;
 
   const handleConfirm = (action: 'LOAN' | 'RETURN') => {
     onAction(action, selectedUser, loanReason, note);
+  };
+
+  const handleUpdate = () => {
+    if (onUpdate && editForm) {
+       onUpdate({
+         ...item,
+         ...editForm
+       } as Equipment);
+       setIsEditing(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (onDelete && confirm("Êtes-vous sûr de vouloir supprimer cet équipement définitivement ?")) {
+      onDelete(item.id);
+      onClose();
+    }
   };
 
   // Get history for this item
@@ -55,113 +84,195 @@ export const ActionModal: React.FC<ActionModalProps> = ({
       <div className="bg-white w-full max-w-md rounded-t-3xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sticky top-0"></div>
         
-        <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
-        <p className="text-slate-500 text-sm mb-6">ID: {item.barcode} • État: {item.condition}</p>
-
-        {/* Actions */}
-        <div className="mb-8">
-          {/* Note field for all actions */}
-          <div className="mb-4">
-            <label className="block text-xs font-medium text-slate-500 mb-1.5">Note / Commentaire</label>
-            <textarea 
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Ajouter une note sur l'état ou l'opération..."
-              className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 resize-none h-20"
-            />
+        {/* Header & Edit Controls */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="flex-1">
+            {isEditing ? (
+               <div className="space-y-2">
+                 <select 
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold"
+                    value={editForm.type}
+                    onChange={e => setEditForm({...editForm, type: e.target.value as EquipmentType})}
+                 >
+                    {Object.values(EquipmentType).map(t => <option key={t} value={t}>{t}</option>)}
+                 </select>
+                 <input 
+                    type="text" 
+                    className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                    value={editForm.barcode}
+                    onChange={e => setEditForm({...editForm, barcode: e.target.value})}
+                    placeholder="Barcode"
+                 />
+               </div>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
+                <p className="text-slate-500 text-sm">ID: {item.barcode} • État: {item.condition}</p>
+              </>
+            )}
           </div>
-
-          {item.status === EquipmentStatus.AVAILABLE && (
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Attribuer à :</label>
-                <div className="relative">
-                  <select 
-                    className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
-                    value={selectedUser}
-                    onChange={e => setSelectedUser(e.target.value)}
-                    disabled={!isAdmin} // Désactiver le select si pas admin (optionnel, ou juste cacher les autres options)
-                  >
-                    {/* Current User Option First */}
-                    {currentUser && (
-                      <option value={currentUser.id} className="font-bold">
-                         👉 {currentUser.rank} {currentUser.name} (MOI)
-                      </option>
-                    )}
-                    
-                    {/* Show other users ONLY if ADMIN */}
-                    {isAdmin && (
-                      <>
-                        <option disabled>──────────────────</option>
-                        {users
-                          .filter(u => u.id !== currentUser?.id)
-                          .sort((a, b) => a.name.localeCompare(b.name))
-                          .map(u => (
-                            <option key={u.id} value={u.id}>
-                              {u.rank ? `${u.rank} ` : ''}{u.name}
-                            </option>
-                        ))}
-                      </>
-                    )}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <UserIcon className="w-4 h-4 text-slate-400" />
-                  </div>
-                </div>
-                {!isAdmin && (
-                  <p className="text-[10px] text-slate-400 mt-1 ml-1">
-                    * Seul un administrateur peut attribuer du matériel à un tiers.
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
-                <select 
-                  className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
-                  value={loanReason}
-                  onChange={e => setLoanReason(e.target.value)}
-                >
-                  <option value="Intervention">Intervention</option>
-                  <option value="Entraînement">Entraînement / Manœuvre</option>
-                  <option value="Maintenance">Maintenance / Entretien</option>
-                  <option value="Autre">Autre</option>
-                </select>
-              </div>
-              <button 
-                onClick={() => handleConfirm('LOAN')}
-                disabled={!selectedUser}
-                className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-transform"
-              >
-                Valider la Sortie
-              </button>
-            </div>
-          )}
-
-          {item.status === EquipmentStatus.LOANED && (
-            <div className="space-y-4">
-              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-sm text-blue-800">
-                    Actuellement attribué à : <br/>
-                    <span className="font-bold text-lg">
-                      {users.find(u => u.id === item.assignedTo)?.name || 'Utilisateur inconnu'}
-                    </span>
-                  </p>
-              </div>
-              <button 
-                onClick={() => handleConfirm('RETURN')}
-                className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
-              >
-                Confirmer le Retour
-              </button>
-            </div>
-          )}
           
-          {item.status === EquipmentStatus.DAMAGED && (
-            <div className="p-4 bg-red-50 text-red-700 rounded-xl text-center font-medium">
-              Matériel hors service. Nécessite réparation ou remplacement.
-            </div>
+          {isAdmin && (
+            <button 
+              onClick={() => isEditing ? setIsEditing(false) : setIsEditing(true)}
+              className="p-2 ml-2 text-slate-400 hover:bg-slate-100 rounded-full transition-colors"
+            >
+              {isEditing ? <X className="w-5 h-5" /> : <Pencil className="w-5 h-5" />}
+            </button>
           )}
         </div>
+        
+        {/* Edit Mode Body */}
+        {isEditing ? (
+          <div className="space-y-4 mb-6 animate-fade-in">
+             <div className="grid grid-cols-2 gap-3">
+                <div>
+                   <label className="text-xs text-slate-500 font-medium">Taille</label>
+                   <select 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm mt-1"
+                      value={editForm.size}
+                      onChange={e => setEditForm({...editForm, size: e.target.value})}
+                   >
+                     {['XS', 'S', 'M', 'L', 'XL', 'XXL', '38', '39', '40', '41', '42', '43', '44', '45'].map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                   </select>
+                </div>
+                <div>
+                   <label className="text-xs text-slate-500 font-medium">État</label>
+                   <select 
+                      className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm mt-1"
+                      value={editForm.condition}
+                      onChange={e => setEditForm({...editForm, condition: e.target.value as any})}
+                   >
+                     {['Neuf', 'Bon', 'Usé', 'Critique'].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                   </select>
+                </div>
+             </div>
+
+             <div className="flex gap-3 pt-2">
+               <button 
+                 onClick={handleDelete}
+                 className="flex-1 flex items-center justify-center gap-2 bg-red-50 text-red-600 py-3 rounded-xl font-bold text-sm hover:bg-red-100"
+               >
+                 <Trash2 className="w-4 h-4" /> Supprimer
+               </button>
+               <button 
+                 onClick={handleUpdate}
+                 className="flex-[2] flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl font-bold text-sm"
+               >
+                 <Save className="w-4 h-4" /> Enregistrer
+               </button>
+             </div>
+          </div>
+        ) : (
+          /* Actions Standard Mode */
+          <div className="mb-8">
+            {/* Note field for all actions */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-slate-500 mb-1.5">Note / Commentaire</label>
+              <textarea 
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="Ajouter une note sur l'état ou l'opération..."
+                className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 resize-none h-20"
+              />
+            </div>
+
+            {item.status === EquipmentStatus.AVAILABLE && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Attribuer à :</label>
+                  <div className="relative">
+                    <select 
+                      className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
+                      value={selectedUser}
+                      onChange={e => setSelectedUser(e.target.value)}
+                      disabled={!isAdmin} // Désactiver le select si pas admin (optionnel, ou juste cacher les autres options)
+                    >
+                      {/* Current User Option First */}
+                      {currentUser && (
+                        <option value={currentUser.id} className="font-bold">
+                           👉 {currentUser.rank} {currentUser.name} (MOI)
+                        </option>
+                      )}
+                      
+                      {/* Show other users ONLY if ADMIN */}
+                      {isAdmin && (
+                        <>
+                          <option disabled>──────────────────</option>
+                          {users
+                            .filter(u => u.id !== currentUser?.id)
+                            .sort((a, b) => a.name.localeCompare(b.name))
+                            .map(u => (
+                              <option key={u.id} value={u.id}>
+                                {u.rank ? `${u.rank} ` : ''}{u.name}
+                              </option>
+                          ))}
+                        </>
+                      )}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <UserIcon className="w-4 h-4 text-slate-400" />
+                    </div>
+                  </div>
+                  {!isAdmin && (
+                    <p className="text-[10px] text-slate-400 mt-1 ml-1">
+                      * Seul un administrateur peut attribuer du matériel à un tiers.
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">Motif de sortie :</label>
+                  <select 
+                    className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700"
+                    value={loanReason}
+                    onChange={e => setLoanReason(e.target.value)}
+                  >
+                    <option value="Intervention">Intervention</option>
+                    <option value="Entraînement">Entraînement / Manœuvre</option>
+                    <option value="Maintenance">Maintenance / Entretien</option>
+                    <option value="Autre">Autre</option>
+                  </select>
+                </div>
+                <button 
+                  onClick={() => handleConfirm('LOAN')}
+                  disabled={!selectedUser}
+                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-transform"
+                >
+                  Valider la Sortie
+                </button>
+              </div>
+            )}
+
+            {item.status === EquipmentStatus.LOANED && (
+              <div className="space-y-4">
+                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                    <p className="text-sm text-blue-800">
+                      Actuellement attribué à : <br/>
+                      <span className="font-bold text-lg">
+                        {users.find(u => u.id === item.assignedTo)?.name || 'Utilisateur inconnu'}
+                      </span>
+                    </p>
+                </div>
+                <button 
+                  onClick={() => handleConfirm('RETURN')}
+                  className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
+                >
+                  Confirmer le Retour
+                </button>
+              </div>
+            )}
+            
+            {item.status === EquipmentStatus.DAMAGED && (
+              <div className="p-4 bg-red-50 text-red-700 rounded-xl text-center font-medium">
+                Matériel hors service. Nécessite réparation ou remplacement.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* History Section */}
         <div className="border-t border-slate-100 pt-6">

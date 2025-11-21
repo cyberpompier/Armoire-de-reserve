@@ -11,10 +11,19 @@ interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
   onAddEquipment: (eq: Equipment) => void;
+  onUpdateEquipment: (eq: Equipment) => void;
+  onDeleteEquipment: (id: string) => void;
   onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
 }
 
-export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onTransaction }) => {
+export const StockManager: React.FC<StockManagerProps> = ({ 
+  state, 
+  currentUser, 
+  onAddEquipment, 
+  onUpdateEquipment,
+  onDeleteEquipment,
+  onTransaction 
+}) => {
   const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const [showScanner, setShowScanner] = useState(false); // AI Scanner
@@ -159,6 +168,8 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           users={state.users}
           transactions={state.transactions}
           onAction={handleAction}
+          onUpdate={onUpdateEquipment}
+          onDelete={onDeleteEquipment}
         />
       )}
     </div>
