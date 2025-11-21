@@ -47,7 +47,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({
       const userEmail = (currentUser as any)?.email;
       
       const subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
-      const body = `Détails de l'emprunt de matériel :\n\n` +
+      const body = `Bonjour, je viens d’emprunter le materiel suivant:\n\n` +
+        `Détails de l'emprunt de matériel :\n\n` +
         `--- MATÉRIEL ---\n` +
         `Type : ${item.type}\n` +
         `Identifiant : ${item.barcode}\n` +
@@ -58,7 +59,9 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Note : ${note || 'Aucune'}\n\n` +
         `--- INFO ---\n` +
         `Enregistré par : ${currentUser?.name || 'Inconnu'}\n` +
-        `Date : ${new Date().toLocaleString('fr-FR')}`;
+        `Date : ${new Date().toLocaleString('fr-FR')}\n\n` +
+        `Je m’engage à le restituer propre, et je signalerais toutes anomalies, via l’application.\n\n` +
+        `Cordialement`;
 
       // Construction du lien mailto
       const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
