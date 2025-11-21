@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { User } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2 } from 'lucide-react';
 
 interface UserProfile {
@@ -13,8 +13,11 @@ interface UserProfile {
   caserne: string | null;
 }
 
-export const Profile = () => {
-  const [user, setUser] = useState<User | null>(null);
+interface ProfileProps {
+  session: Session | null;
+}
+
+export const Profile: React.FC<ProfileProps> = ({ session }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -34,8 +37,8 @@ export const Profile = () => {
   useEffect(() => {
     const getProfileData = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
+        // Optimisation : On utilise la session passée en props au lieu de refaire un appel getUser()
+        const user = session?.user;
 
         if (user) {
           const { data, error } = await supabase
@@ -45,8 +48,7 @@ export const Profile = () => {
             .single();
 
           if (error) {
-            console.warn('Profil non trouvé ou erreur:', error.message);
-            // Si pas de profil, on pré-remplit avec l'email de l'auth
+            // Si pas de profil (nouvel utilisateur), on pré-remplit avec l'email
             setFormData(prev => ({ ...prev, email: user.email || '' }));
           } else {
             setProfile(data);
@@ -59,8 +61,11 @@ export const Profile = () => {
         setLoading(false);
       }
     };
-    getProfileData();
-  }, []);
+
+    if (session) {
+      getProfileData();
+    }
+  }, [session]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -72,7 +77,9 @@ export const Profile = () => {
   };
 
   const handleSave = async () => {
+    const user = session?.user;
     if (!user) return;
+    
     setSaving(true);
     try {
       const updates = {
@@ -103,7 +110,13 @@ export const Profile = () => {
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-slate-400">Chargement...</div>;
+    return (
+      <div className="p-8 flex flex-col items-center justify-center h-full space-y-4 animate-pulse">
+        <div className="w-24 h-24 bg-slate-200 rounded-full"></div>
+        <div className="h-4 w-32 bg-slate-200 rounded"></div>
+        <div className="h-3 w-48 bg-slate-200 rounded"></div>
+      </div>
+    );
   }
 
   const displayName = profile?.prenom || profile?.nom 
@@ -142,7 +155,7 @@ export const Profile = () => {
 
             <div className="flex items-center gap-1.5 text-slate-500 text-xs bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
                <Mail className="w-3 h-3" />
-               {profile?.email || user?.email}
+               {profile?.email || session?.user.email}
             </div>
             
             <div className="flex gap-2 justify-center w-full flex-wrap">
@@ -201,7 +214,7 @@ export const Profile = () => {
        </button>
        
        <p className="mt-6 text-[10px] text-slate-300 text-center font-mono">
-         UID: {user?.id.slice(0, 8)}...
+         UID: {session?.user.id.slice(0, 8)}...
        </p>
 
        {/* MODAL D'ÉDITION */}

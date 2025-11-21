@@ -175,7 +175,7 @@ const App: React.FC = () => {
               onTransaction={handleTransaction}
             />
           )}
-          {activeTab === 'profile' && <Profile />}
+          {activeTab === 'profile' && <Profile session={session} />}
           {activeTab === 'settings' && (
              <div className="p-6 flex flex-col items-center justify-center min-h-full text-slate-400">
                <Settings className="w-16 h-16 mb-4 opacity-20" />
