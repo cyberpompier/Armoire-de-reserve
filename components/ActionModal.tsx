@@ -49,7 +49,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     .sort((a, b) => b.timestamp - a.timestamp);
 
   // Check if admin
-  const isAdmin = currentUser?.role === 'ADMIN';
+  const isAdmin = currentUser?.role === 'administrateur';
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">

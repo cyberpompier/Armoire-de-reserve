@@ -68,7 +68,7 @@ const App: React.FC = () => {
           matricule: data.matricule || 'N/A',
           name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur',
-          role: data.role || 'USER'
+          role: data.role || 'utilisateur'
         };
         setCurrentUser(userProfile);
       }
@@ -92,7 +92,7 @@ const App: React.FC = () => {
           // Formatage : NOM Prénom
           name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
           rank: p.grade || '',
-          role: p.role || 'USER'
+          role: p.role || 'utilisateur'
         }));
 
         setState(prev => ({
@@ -163,7 +163,7 @@ const App: React.FC = () => {
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
                <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
-               {currentUser?.role === 'ADMIN' && (
+               {currentUser?.role === 'administrateur' && (
                  <div className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold">
                     Panneau Administrateur Actif
                  </div>
