@@ -14,7 +14,10 @@ interface AddItemModalProps {
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest }) => {
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
-  const [newItemCondition, setNewItemCondition] = useState(initialItem?.condition || 'Neuf');
+  // Typage explicite pour éviter les conflits
+  const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>(
+    initialItem?.condition || 'Neuf'
+  );
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -28,7 +31,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       size: newItemSize,
       barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
       status: newItemStatus,
-      condition: newItemCondition as any,
+      condition: newItemCondition,
       imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
       assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
     };
@@ -141,7 +144,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                 <label className="block text-xs font-medium text-slate-500 mb-1">État (Usure)</label>
                 <select 
                   value={newItemCondition}
-                  onChange={(e) => setNewItemCondition(e.target.value)}
+                  // Ajout du cast 'as any' pour résoudre l'erreur TS2345
+                  onChange={(e) => setNewItemCondition(e.target.value as any)}
                   className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
                 >
                   {['Neuf', 'Bon', 'Usé', 'Critique'].map(c => (
