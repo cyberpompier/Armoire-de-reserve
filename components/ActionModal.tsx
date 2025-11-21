@@ -40,12 +40,11 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   if (!isOpen || !item) return null;
 
   const handleConfirm = (action: 'LOAN' | 'RETURN') => {
+    // Configuration de l'email commune
+    const recipient = 'sebastien.dupressoir@sdis60.fr';
+    const userEmail = (currentUser as any)?.email;
+
     if (action === 'LOAN') {
-      // Email configuration
-      const recipient = 'sebastien.dupressoir@sdis60.fr';
-      // Tentative de récupération de l'email de l'utilisateur connecté (avec sécurité si le champ n'existe pas dans le type)
-      const userEmail = (currentUser as any)?.email;
-      
       const subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
       const body = `Bonjour, je viens d’emprunter le materiel suivant:\n\n` +
         `Détails de l'emprunt de matériel :\n\n` +
@@ -63,10 +62,27 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Je m’engage à le restituer propre, et je signalerais toutes anomalies, via l’application.\n\n` +
         `Cordialement`;
 
-      // Construction du lien mailto
       const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      
-      // Ouverture du client mail
+      window.location.href = mailtoLink;
+    } 
+    else if (action === 'RETURN') {
+      const assignedUser = users.find(u => u.id === item.assignedTo);
+      const subject = `Retour EPI : ${item.type} - ${item.barcode}`;
+      const body = `Bonjour, je viens de restituer le materiel suivant:\n\n` +
+        `Détails du retour de matériel :\n\n` +
+        `--- MATÉRIEL ---\n` +
+        `Type : ${item.type}\n` +
+        `Identifiant : ${item.barcode}\n` +
+        `État : ${item.condition}\n\n` +
+        `--- RETOUR ---\n` +
+        `Restitué par : ${assignedUser?.name || 'Inconnu'}\n` +
+        `Note : ${note || 'Aucune'}\n\n` +
+        `--- INFO ---\n` +
+        `Enregistré par : ${currentUser?.name || 'Inconnu'}\n` +
+        `Date : ${new Date().toLocaleString('fr-FR')}\n\n` +
+        `Cordialement`;
+
+      const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.location.href = mailtoLink;
     }
 
@@ -197,7 +213,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                 onClick={() => handleConfirm('RETURN')}
                 className="w-full bg-green-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-green-200 active:scale-[0.98] transition-transform"
               >
-                Confirmer le Retour
+                Confirmer le Retour (avec Email)
               </button>
             </div>
           )}
