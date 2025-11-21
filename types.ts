@@ -5,7 +5,7 @@ export interface User {
   email?: string;
   matricule?: string;
   caserne?: string;
-  role?: 'ADMIN' | 'USER';
+  role?: 'admin' | 'pompier';
 }
 
 export enum EquipmentStatus {

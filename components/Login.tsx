@@ -23,7 +23,7 @@ export const Login = () => {
           password,
           options: {
             data: {
-              role: 'USER', // Attribution automatique du rôle
+              role: 'pompier', // Attribution automatique du rôle standard (minuscule)
             }
           }
         });

@@ -48,8 +48,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     .filter(t => t.equipmentId === item.id)
     .sort((a, b) => b.timestamp - a.timestamp);
 
-  // Check if admin
-  const isAdmin = currentUser?.role === 'ADMIN';
+  // Check if admin (lowercase)
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">
