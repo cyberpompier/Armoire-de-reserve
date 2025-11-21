@@ -14,6 +14,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
   const [newItemCondition, setNewItemCondition] = useState(initialItem?.condition || 'Neuf');
+  const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
 
   const isEditing = !!initialItem;
@@ -24,10 +25,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       type: newItemType,
       size: newItemSize,
       barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
-      status: initialItem?.status || EquipmentStatus.AVAILABLE,
+      status: newItemStatus,
       condition: newItemCondition as any,
       imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
-      assignedTo: initialItem?.assignedTo
+      // Si on passe en disponible, on retire l'assignation. Sinon on garde l'existant.
+      assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
     };
 
     if (isEditing && onUpdate) {
@@ -96,6 +98,25 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                  ))}
                </select>
             </div>
+            
+            {/* Status Selector */}
+            <div>
+               <label className="block text-xs font-medium text-slate-500 mb-1">Statut (Disponibilité)</label>
+               <select 
+                 value={newItemStatus}
+                 onChange={(e) => setNewItemStatus(e.target.value as EquipmentStatus)}
+                 className={`w-full p-2.5 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-medium ${
+                    newItemStatus === EquipmentStatus.AVAILABLE ? 'bg-green-50 text-green-700' :
+                    newItemStatus === EquipmentStatus.LOANED ? 'bg-blue-50 text-blue-700' :
+                    'bg-red-50 text-red-700'
+                 }`}
+               >
+                 {Object.values(EquipmentStatus).map(s => (
+                   <option key={s} value={s}>{s}</option>
+                 ))}
+               </select>
+            </div>
+
             <div className="flex gap-3">
               <div className="flex-1">
                 <label className="block text-xs font-medium text-slate-500 mb-1">Taille</label>
@@ -110,7 +131,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                 </select>
               </div>
               <div className="flex-1">
-                <label className="block text-xs font-medium text-slate-500 mb-1">État</label>
+                <label className="block text-xs font-medium text-slate-500 mb-1">État (Usure)</label>
                 <select 
                   value={newItemCondition}
                   onChange={(e) => setNewItemCondition(e.target.value)}
