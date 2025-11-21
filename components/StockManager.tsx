@@ -1,166 +1,195 @@
-import React, { useState } from 'react';
-import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
-import { ScannerAI } from './ScannerAI';
-import { BarcodeScanner } from './BarcodeScanner';
-import { StockHeader } from './StockHeader';
-import { StockList } from './StockList';
-import { AddItemModal } from './AddItemModal';
+import React, { useState, useMemo } from 'react';
+import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from '../types';
+import { Search, Filter, Plus, ChevronRight, AlertCircle } from 'lucide-react';
 import { ActionModal } from './ActionModal';
 
 interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
   onAddEquipment: (eq: Equipment) => void;
-  onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
+  onTransaction: (trans: Transaction, newStatus: EquipmentStatus, userId?: string) => void;
+  onUpdateEquipment: (eq: Equipment) => void;
 }
 
-export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onTransaction }) => {
-  const [filter, setFilter] = useState<string>('ALL');
-  const [search, setSearch] = useState('');
-  const [showScanner, setShowScanner] = useState(false); // AI Scanner
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false); // Barcode Scanner
-  
+export const StockManager: React.FC<StockManagerProps> = ({
+  state,
+  currentUser,
+  onAddEquipment,
+  onTransaction,
+  onUpdateEquipment
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState<string>('ALL');
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null);
-  const [showActionModal, setShowActionModal] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [isActionModalOpen, setIsActionModalOpen] = useState(false);
 
-  // Filter logic
-  const filteredItems = state.inventory.filter(item => {
-    const matchesFilter = filter === 'ALL' || item.status === filter;
-    const matchesSearch = item.type.toLowerCase().includes(search.toLowerCase()) || 
-                          item.barcode.includes(search) || 
-                          (item.assignedTo && state.users.find(u => u.id === item.assignedTo)?.name.toLowerCase().includes(search.toLowerCase()));
-    return matchesFilter && matchesSearch;
-  });
-
-  // Sound Feedback
-  const playBeep = () => {
-    try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContext) return;
+  // Filter Logic
+  const filteredInventory = useMemo(() => {
+    return state.inventory.filter(item => {
+      const matchesSearch = 
+        item.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.assignedTo && state.users.find(u => u.id === item.assignedTo)?.name.toLowerCase().includes(searchTerm.toLowerCase()));
       
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const matchesType = filterType === 'ALL' || item.type === filterType;
+      
+      return matchesSearch && matchesType;
+    });
+  }, [state.inventory, searchTerm, filterType, state.users]);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.type = 'sine';
-      osc.frequency.value = 1000; // 1000Hz beep
-      gain.gain.value = 0.1; // Volume bas
-
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15); // 150ms duration
-    } catch (e) {
-      console.error("Audio play failed", e);
-    }
-  };
-
-  const handleAiIdentify = (type: EquipmentType, condition: string) => {
-    playBeep();
-    // Create new item from scan
-    const newItem: Equipment = {
-      id: Date.now().toString(),
-      type,
-      size: 'L', // Default
-      barcode: `GEN-${Date.now().toString().slice(-6)}`,
-      status: EquipmentStatus.AVAILABLE,
-      condition: condition as 'Neuf'|'Bon'|'Usé'|'Critique',
-      imageUrl: `https://picsum.photos/200?random=${Date.now()}`
-    };
-    onAddEquipment(newItem);
-  };
-
-  const handleBarcodeFound = (code: string) => {
-    // Try to find item in inventory
-    const foundItem = state.inventory.find(item => item.barcode === code);
-    
-    if (foundItem) {
-      playBeep();
-      // Item found: Open action modal directly
-      setShowBarcodeScanner(false);
-      setSelectedItem(foundItem);
-      setShowActionModal(true);
-    } else {
-      alert(`Équipement introuvable avec le code : ${code}`);
-      setShowBarcodeScanner(false);
-      setSearch(code);
-    }
-  };
-
-  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
-    if (!selectedItem) return;
-
-    const transaction: any = {
-      id: Date.now().toString(),
-      equipmentId: selectedItem.id,
-      userId: action === 'LOAN' && userId ? userId : (selectedItem.assignedTo || 'SYSTEM'),
-      type: action === 'LOAN' ? 'OUT' : 'IN',
-      timestamp: Date.now(),
-      note: note?.trim(),
-      reason: action === 'LOAN' ? reason : undefined
-    };
-
-    const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
-    onTransaction(transaction, newStatus, action === 'LOAN' ? userId : undefined);
-    setShowActionModal(false);
+  // Handle Modal Close
+  const handleCloseModal = () => {
+    setIsActionModalOpen(false);
     setSelectedItem(null);
   };
 
+  // Handle Transaction from Modal
+  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
+    if (!selectedItem || !currentUser) return;
+
+    const newTrans: Transaction = {
+      id: Date.now().toString(),
+      equipmentId: selectedItem.id,
+      userId: userId || currentUser.id, // Defaults to current user if not specified
+      type: action === 'LOAN' ? 'OUT' : 'IN',
+      timestamp: Date.now(),
+      reason: reason,
+      note: note
+    };
+
+    const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
+    
+    onTransaction(newTrans, newStatus, action === 'LOAN' ? userId : undefined);
+    handleCloseModal();
+  };
+
+  // Handle Update from Modal
+  const handleUpdate = (updatedItem: Equipment) => {
+    onUpdateEquipment(updatedItem);
+    // On ne ferme pas forcément la modale, ou on peut, selon l'UX. Ici on ferme.
+    handleCloseModal(); 
+  };
+
   return (
-    <div className="pb-6 animate-fade-in">
-      {showScanner && (
-        <ScannerAI 
-          onClose={() => setShowScanner(false)} 
-          onIdentified={handleAiIdentify} 
-        />
-      )}
+    <div className="p-6 pb-24 min-h-full">
+      {/* Header */}
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Inventaire</h1>
+          <p className="text-slate-500 text-sm">{state.inventory.length} équipements enregistrés</p>
+        </div>
+        <button 
+          className="bg-fire-600 text-white p-3 rounded-xl shadow-lg shadow-fire-200 active:scale-95 transition-all"
+          onClick={() => {
+              // Logic for adding new equipment would go here (out of scope for this specific edit, but button exists)
+              const newId = (state.inventory.length + 1).toString();
+              onAddEquipment({
+                  id: newId,
+                  type: EquipmentType.HELMET, // Default
+                  size: 'M',
+                  barcode: `NEW-${newId.padStart(3, '0')}`,
+                  status: EquipmentStatus.AVAILABLE,
+                  condition: 'Neuf'
+              });
+          }}
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
 
-      {showBarcodeScanner && (
-        <BarcodeScanner
-          onClose={() => setShowBarcodeScanner(false)}
-          onScan={handleBarcodeFound}
-        />
-      )}
+      {/* Search & Filter */}
+      <div className="flex gap-3 mb-6">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Rechercher (ref, type, porteur)..." 
+            className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-slate-100 text-sm shadow-sm outline-none focus:ring-2 focus:ring-fire-100"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="relative">
+           <select 
+             className="appearance-none bg-white px-4 py-3 pr-10 rounded-xl border border-slate-100 text-sm shadow-sm outline-none focus:ring-2 focus:ring-fire-100 font-medium text-slate-600"
+             value={filterType}
+             onChange={e => setFilterType(e.target.value)}
+           >
+             <option value="ALL">Tous</option>
+             {Object.values(EquipmentType).map(t => (
+               <option key={t} value={t}>{t}</option>
+             ))}
+           </select>
+           <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        </div>
+      </div>
 
-      <StockHeader 
-        search={search}
-        onSearchChange={setSearch}
-        filter={filter}
-        onFilterChange={setFilter}
-        onScanClick={() => setShowBarcodeScanner(true)}
-        onAddClick={() => setShowAddModal(true)}
-      />
+      {/* Inventory List */}
+      <div className="space-y-3">
+        {filteredInventory.length === 0 ? (
+           <div className="text-center py-12 text-slate-400">
+             <p>Aucun équipement trouvé.</p>
+           </div>
+        ) : (
+          filteredInventory.map(item => {
+            const isAvailable = item.status === EquipmentStatus.AVAILABLE;
+            const assignedUser = item.assignedTo ? state.users.find(u => u.id === item.assignedTo) : null;
 
-      <StockList 
-        items={filteredItems}
+            return (
+              <div 
+                key={item.id} 
+                onClick={() => { setSelectedItem(item); setIsActionModalOpen(true); }}
+                className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm active:scale-[0.99] transition-transform cursor-pointer flex items-center gap-4 relative overflow-hidden"
+              >
+                {/* Status Indicator Bar */}
+                <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                  item.status === EquipmentStatus.AVAILABLE ? 'bg-emerald-500' :
+                  item.status === EquipmentStatus.LOANED ? 'bg-blue-500' :
+                  'bg-red-500'
+                }`}></div>
+
+                <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-600 shrink-0">
+                  <span className="text-xs font-bold">{item.size}</span>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start">
+                    <h3 className="font-bold text-slate-800 truncate pr-2">{item.type}</h3>
+                    <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded">{item.barcode}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className={`text-xs px-2 py-0.5 rounded-md font-medium ${
+                       item.status === EquipmentStatus.AVAILABLE ? 'bg-emerald-50 text-emerald-700' :
+                       item.status === EquipmentStatus.LOANED ? 'bg-blue-50 text-blue-700' :
+                       'bg-red-50 text-red-700'
+                    }`}>
+                      {item.status}
+                    </span>
+                    {assignedUser && (
+                      <span className="text-xs text-slate-500 truncate">
+                         • {assignedUser.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <ChevronRight className="w-5 h-5 text-slate-300" />
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      <ActionModal 
+        isOpen={isActionModalOpen}
+        onClose={handleCloseModal}
+        item={selectedItem}
+        currentUser={currentUser}
         users={state.users}
-        onItemClick={(item) => {
-          setSelectedItem(item);
-          setShowActionModal(true);
-        }}
+        transactions={state.transactions}
+        onAction={handleAction}
+        onUpdate={handleUpdate}
       />
-
-      {showAddModal && (
-        <AddItemModal 
-          onClose={() => setShowAddModal(false)}
-          onAdd={onAddEquipment}
-          onScanRequest={() => setShowScanner(true)}
-        />
-      )}
-
-      {showActionModal && (
-        <ActionModal 
-          isOpen={showActionModal}
-          onClose={() => setShowActionModal(false)}
-          item={selectedItem}
-          currentUser={currentUser}
-          users={state.users}
-          transactions={state.transactions}
-          onAction={handleAction}
-        />
-      )}
     </div>
   );
 };
