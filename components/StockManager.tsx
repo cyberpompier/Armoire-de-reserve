@@ -11,16 +11,18 @@ interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
   onAddEquipment: (eq: Equipment) => void;
+  onUpdateEquipment: (eq: Equipment) => void;
   onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
 }
 
-export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onTransaction }) => {
+export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onUpdateEquipment, onTransaction }) => {
   const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
   const [showScanner, setShowScanner] = useState(false); // AI Scanner
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false); // Barcode Scanner
   
   const [selectedItem, setSelectedItem] = useState<Equipment | null>(null);
+  const [editingItem, setEditingItem] = useState<Equipment | null>(null); // Item being edited
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -130,7 +132,10 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
         filter={filter}
         onFilterChange={setFilter}
         onScanClick={() => setShowBarcodeScanner(true)}
-        onAddClick={() => setShowAddModal(true)}
+        onAddClick={() => {
+          setEditingItem(null); // Ensure we are in Add mode
+          setShowAddModal(true);
+        }}
       />
 
       <StockList 
@@ -144,8 +149,13 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
 
       {showAddModal && (
         <AddItemModal 
-          onClose={() => setShowAddModal(false)}
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingItem(null);
+          }}
           onAdd={onAddEquipment}
+          onUpdate={onUpdateEquipment}
+          initialItem={editingItem}
           onScanRequest={() => setShowScanner(true)}
         />
       )}
@@ -159,6 +169,12 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           users={state.users}
           transactions={state.transactions}
           onAction={handleAction}
+          onEdit={(item) => {
+            setShowActionModal(false); // Close view modal
+            setSelectedItem(null);
+            setEditingItem(item); // Set item to edit
+            setShowAddModal(true); // Open edit modal (which is AddItemModal)
+          }}
         />
       )}
     </div>

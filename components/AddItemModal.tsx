@@ -1,30 +1,40 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentStatus, EquipmentType } from '../types';
-import { ScanLine, X } from 'lucide-react';
+import { ScanLine, X, Pencil } from 'lucide-react';
 
 interface AddItemModalProps {
   onClose: () => void;
   onAdd: (item: Equipment) => void;
+  onUpdate?: (item: Equipment) => void;
+  initialItem?: Equipment | null;
   onScanRequest: () => void;
 }
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onScanRequest }) => {
-  const [newItemType, setNewItemType] = useState<EquipmentType>(EquipmentType.HELMET);
-  const [newItemSize, setNewItemSize] = useState('L');
-  const [newItemCondition, setNewItemCondition] = useState('Neuf');
-  const [newItemBarcode, setNewItemBarcode] = useState('');
+export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, initialItem, onScanRequest }) => {
+  const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
+  const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
+  const [newItemCondition, setNewItemCondition] = useState(initialItem?.condition || 'Neuf');
+  const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
 
-  const handleManualAdd = () => {
-    const newItem: Equipment = {
-      id: Date.now().toString(),
+  const isEditing = !!initialItem;
+
+  const handleSave = () => {
+    const itemData: Equipment = {
+      id: initialItem?.id || Date.now().toString(),
       type: newItemType,
       size: newItemSize,
       barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
-      status: EquipmentStatus.AVAILABLE,
+      status: initialItem?.status || EquipmentStatus.AVAILABLE,
       condition: newItemCondition as any,
-      imageUrl: `https://picsum.photos/200?random=${Date.now()}`
+      imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
+      assignedTo: initialItem?.assignedTo
     };
-    onAdd(newItem);
+
+    if (isEditing && onUpdate) {
+      onUpdate(itemData);
+    } else {
+      onAdd(itemData);
+    }
     onClose();
   };
 
@@ -33,29 +43,35 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onSc
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 animate-fade-in overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-lg text-slate-800">Ajouter un EPI</h3>
+          <h3 className="font-bold text-lg text-slate-800">
+            {isEditing ? 'Modifier l\'EPI' : 'Ajouter un EPI'}
+          </h3>
           <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>
         
         <div className="p-6 space-y-4">
-          <button 
-            onClick={() => { onClose(); onScanRequest(); }}
-            className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 p-4 rounded-xl border border-slate-200 transition-colors group"
-          >
-            <ScanLine className="w-5 h-5 text-slate-500 group-hover:text-slate-800" />
-            <span className="font-medium">Scanner avec l'IA</span>
-          </button>
+          {!isEditing && (
+            <>
+              <button 
+                onClick={() => { onClose(); onScanRequest(); }}
+                className="w-full flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 p-4 rounded-xl border border-slate-200 transition-colors group"
+              >
+                <ScanLine className="w-5 h-5 text-slate-500 group-hover:text-slate-800" />
+                <span className="font-medium">Scanner avec l'IA</span>
+              </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center" aria-hidden="true">
-              <div className="w-full border-t border-slate-200"></div>
-            </div>
-            <div className="relative flex justify-center">
-              <span className="bg-white px-2 text-xs text-slate-400 uppercase">ou manuel</span>
-            </div>
-          </div>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-2 text-xs text-slate-400 uppercase">ou manuel</span>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="space-y-3">
             <div>
@@ -109,10 +125,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onSc
           </div>
 
           <button 
-            onClick={handleManualAdd}
-            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2"
+            onClick={handleSave}
+            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2 flex items-center justify-center gap-2"
           >
-            Créer l'équipement
+            {isEditing && <Pencil className="w-4 h-4" />}
+            {isEditing ? 'Mettre à jour' : 'Créer l\'équipement'}
           </button>
         </div>
       </div>

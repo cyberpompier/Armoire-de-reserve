@@ -140,6 +140,15 @@ const App: React.FC = () => {
     setActiveTab('stock');
   };
 
+  const handleUpdateEquipment = (updatedItem: Equipment) => {
+    setState(prev => ({
+      ...prev,
+      inventory: prev.inventory.map(item => 
+        item.id === updatedItem.id ? updatedItem : item
+      )
+    }));
+  };
+
   if (!session) {
     return <Login />;
   }
@@ -154,6 +163,7 @@ const App: React.FC = () => {
               state={state} 
               currentUser={currentUser}
               onAddEquipment={handleAddEquipment}
+              onUpdateEquipment={handleUpdateEquipment}
               onTransaction={handleTransaction}
             />
           )}
