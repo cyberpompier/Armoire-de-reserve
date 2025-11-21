@@ -21,6 +21,8 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
   onAddClick,
   userRole
 }) => {
+  const isAdmin = userRole?.toLowerCase() === 'admin';
+
   return (
     <div className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 px-4 py-3 border-b border-slate-200">
       <div className="flex gap-2 mb-3">
@@ -43,7 +45,7 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
           <QrCode className="w-5 h-5" />
         </button>
 
-        {userRole === 'admin' && (
+        {isAdmin && (
           <button 
             onClick={onAddClick}
             className="bg-slate-900 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-transform"
