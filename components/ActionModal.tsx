@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Equipment, EquipmentStatus, Transaction, User } from '../types';
-import { History, User as UserIcon } from 'lucide-react';
+import { History, User as UserIcon, Pencil } from 'lucide-react';
 
 interface ActionModalProps {
   isOpen: boolean;
@@ -10,6 +10,7 @@ interface ActionModalProps {
   users: User[];
   transactions: Transaction[];
   onAction: (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => void;
+  onEdit?: (item: Equipment) => void;
 }
 
 export const ActionModal: React.FC<ActionModalProps> = ({
@@ -19,7 +20,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   currentUser,
   users,
   transactions,
-  onAction
+  onAction,
+  onEdit
 }) => {
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [note, setNote] = useState('');
@@ -55,8 +57,21 @@ export const ActionModal: React.FC<ActionModalProps> = ({
       <div className="bg-white w-full max-w-md rounded-t-3xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6 sticky top-0"></div>
         
-        <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
-        <p className="text-slate-500 text-sm mb-6">ID: {item.barcode} • État: {item.condition}</p>
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900 mb-1">{item.type}</h2>
+            <p className="text-slate-500 text-sm">ID: {item.barcode} • État: {item.condition}</p>
+          </div>
+          {isAdmin && (
+            <button 
+              onClick={() => onEdit?.(item)}
+              className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 active:scale-95 transition-all border border-slate-200"
+              title="Modifier l'équipement"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
         {/* Actions */}
         <div className="mb-8">
@@ -80,8 +95,9 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                     className="w-full p-3 bg-slate-50 rounded-xl border-r-8 border-transparent outline-none text-slate-700 appearance-none"
                     value={selectedUser}
                     onChange={e => setSelectedUser(e.target.value)}
-                    disabled={!isAdmin} // Désactiver le select si pas admin (optionnel, ou juste cacher les autres options)
+                    disabled={!isAdmin} // Désactiver le select si pas admin
                   >
+                    <option value="">Sélectionner...</option>
                     {/* Current User Option First */}
                     {currentUser && (
                       <option value={currentUser.id} className="font-bold">
