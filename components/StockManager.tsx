@@ -137,6 +137,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           setEditingItem(null); // Ensure we are in Add mode
           setShowAddModal(true);
         }}
+        userRole={currentUser?.role} // Ajout de la prop userRole ici
       />
 
       <StockList 
