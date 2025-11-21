@@ -9,6 +9,7 @@ interface StockHeaderProps {
   onFilterChange: (value: string) => void;
   onScanClick: () => void;
   onAddClick: () => void;
+  userRole?: string;
 }
 
 export const StockHeader: React.FC<StockHeaderProps> = ({
@@ -17,7 +18,8 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
   filter,
   onFilterChange,
   onScanClick,
-  onAddClick
+  onAddClick,
+  userRole
 }) => {
   return (
     <div className="sticky top-0 bg-slate-50/90 backdrop-blur-md z-10 px-4 py-3 border-b border-slate-200">
@@ -41,12 +43,14 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
           <QrCode className="w-5 h-5" />
         </button>
 
-        <button 
-          onClick={onAddClick}
-          className="bg-slate-900 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-transform"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
+        {userRole !== 'pompier' && (
+          <button 
+            onClick={onAddClick}
+            className="bg-slate-900 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-transform"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Status Chips */}
