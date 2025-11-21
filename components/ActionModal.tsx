@@ -40,6 +40,33 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   if (!isOpen || !item) return null;
 
   const handleConfirm = (action: 'LOAN' | 'RETURN') => {
+    if (action === 'LOAN') {
+      // Email configuration
+      const recipient = 'sebastien.dupressoir@sdis60.fr';
+      // Tentative de récupération de l'email de l'utilisateur connecté (avec sécurité si le champ n'existe pas dans le type)
+      const userEmail = (currentUser as any)?.email;
+      
+      const subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
+      const body = `Détails de l'emprunt de matériel :\n\n` +
+        `--- MATÉRIEL ---\n` +
+        `Type : ${item.type}\n` +
+        `Identifiant : ${item.barcode}\n` +
+        `État : ${item.condition}\n\n` +
+        `--- SORTIE ---\n` +
+        `Attribué à : ${users.find(u => u.id === selectedUser)?.name || 'Inconnu'}\n` +
+        `Motif : ${loanReason}\n` +
+        `Note : ${note || 'Aucune'}\n\n` +
+        `--- INFO ---\n` +
+        `Enregistré par : ${currentUser?.name || 'Inconnu'}\n` +
+        `Date : ${new Date().toLocaleString('fr-FR')}`;
+
+      // Construction du lien mailto
+      const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      
+      // Ouverture du client mail
+      window.location.href = mailtoLink;
+    }
+
     onAction(action, selectedUser, loanReason, note);
   };
 
@@ -148,7 +175,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                 disabled={!selectedUser}
                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 disabled:opacity-50 disabled:shadow-none active:scale-[0.98] transition-transform"
               >
-                Valider la Sortie
+                Valider la Sortie (avec Email)
               </button>
             </div>
           )}
