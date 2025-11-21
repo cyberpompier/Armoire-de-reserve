@@ -1,21 +1,23 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentStatus, EquipmentType } from '../types';
-import { ScanLine, X, Pencil } from 'lucide-react';
+import { ScanLine, X, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 
 interface AddItemModalProps {
   onClose: () => void;
   onAdd: (item: Equipment) => void;
   onUpdate?: (item: Equipment) => void;
+  onDelete?: (itemId: string) => void;
   initialItem?: Equipment | null;
   onScanRequest: () => void;
 }
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, initialItem, onScanRequest }) => {
+export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest }) => {
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
   const [newItemCondition, setNewItemCondition] = useState(initialItem?.condition || 'Neuf');
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const isEditing = !!initialItem;
 
@@ -28,7 +30,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       status: newItemStatus,
       condition: newItemCondition as any,
       imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
-      // Si on passe en disponible, on retire l'assignation. Sinon on garde l'existant.
       assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
     };
 
@@ -40,11 +41,18 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     onClose();
   };
 
+  const handleDelete = () => {
+    if (initialItem && onDelete) {
+      onDelete(initialItem.id);
+      onClose();
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
-      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 animate-fade-in overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+      <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 animate-fade-in overflow-hidden max-h-[90vh] overflow-y-auto">
+        <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg text-slate-800">
             {isEditing ? 'Modifier l\'EPI' : 'Ajouter un EPI'}
           </h3>
@@ -99,7 +107,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                </select>
             </div>
             
-            {/* Status Selector */}
             <div>
                <label className="block text-xs font-medium text-slate-500 mb-1">Statut (Disponibilité)</label>
                <select 
@@ -152,6 +159,42 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
             {isEditing && <Pencil className="w-4 h-4" />}
             {isEditing ? 'Mettre à jour' : 'Créer l\'équipement'}
           </button>
+
+          {/* Delete Button */}
+          {isEditing && onDelete && (
+            <div className="pt-4 mt-2 border-t border-slate-100">
+              {!confirmDelete ? (
+                <button 
+                  onClick={() => setConfirmDelete(true)}
+                  className="w-full py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Supprimer l'équipement
+                </button>
+              ) : (
+                <div className="bg-red-50 p-3 rounded-xl animate-fade-in">
+                   <div className="flex items-center gap-2 text-red-600 mb-2">
+                     <AlertTriangle className="w-4 h-4" />
+                     <span className="text-xs font-bold">Êtes-vous sûr ?</span>
+                   </div>
+                   <div className="flex gap-2">
+                     <button 
+                       onClick={() => setConfirmDelete(false)}
+                       className="flex-1 py-2 bg-white text-slate-600 text-xs font-bold rounded-lg border border-red-100"
+                     >
+                       Annuler
+                     </button>
+                     <button 
+                       onClick={handleDelete}
+                       className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-sm"
+                     >
+                       Confirmer
+                     </button>
+                   </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -149,6 +149,13 @@ const App: React.FC = () => {
     }));
   };
 
+  const handleDeleteEquipment = (itemId: string) => {
+    setState(prev => ({
+      ...prev,
+      inventory: prev.inventory.filter(item => item.id !== itemId)
+    }));
+  };
+
   if (!session) {
     return <Login />;
   }
@@ -164,6 +171,7 @@ const App: React.FC = () => {
               currentUser={currentUser}
               onAddEquipment={handleAddEquipment}
               onUpdateEquipment={handleUpdateEquipment}
+              onDeleteEquipment={handleDeleteEquipment}
               onTransaction={handleTransaction}
             />
           )}
