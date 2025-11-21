@@ -43,7 +43,7 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
           <QrCode className="w-5 h-5" />
         </button>
 
-        {userRole === 'admin' && (
+        {userRole !== 'pompier' && (
           <button 
             onClick={onAddClick}
             className="bg-slate-900 text-white p-2 rounded-xl shadow-lg active:scale-95 transition-transform"
