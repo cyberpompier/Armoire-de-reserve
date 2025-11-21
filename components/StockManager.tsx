@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { AppState, Equipment, Transaction, User, EquipmentStatus } from '../types';
+import { AppState, Equipment, Transaction, User, EquipmentStatus, EquipmentType } from '../types';
 import { StockHeader } from './StockHeader';
 import { EquipmentList } from './EquipmentList';
 import { AddItemModal } from './AddItemModal';
-import { Scanner } from './Scanner';
+import { BarcodeScanner } from './BarcodeScanner';
+import { ScannerAI } from './ScannerAI';
 
 interface StockManagerProps {
   state: AppState;
@@ -24,9 +25,13 @@ export const StockManager: React.FC<StockManagerProps> = ({
 }) => {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('ALL');
-  const [isScanning, setIsScanning] = useState(false);
+  const [isScanning, setIsScanning] = useState(false); // Scanner Code-barres (Recherche)
+  const [isAiScanning, setIsAiScanning] = useState(false); // Scanner IA (Ajout)
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
+  
+  // Stocke les données trouvées par l'IA pour pré-remplir le formulaire
+  const [aiDraftItem, setAiDraftItem] = useState<Equipment | null>(null);
 
   const filteredInventory = useMemo(() => {
     return state.inventory.filter(item => {
@@ -41,6 +46,27 @@ export const StockManager: React.FC<StockManagerProps> = ({
     });
   }, [state.inventory, search, filter, state.users]);
 
+  const handleAiIdentified = (type: EquipmentType, condition: string) => {
+    // Création d'un objet temporaire avec les infos de l'IA
+    const draft: Equipment = {
+      id: '',
+      type: type,
+      condition: condition as any, // Cast car string vs literal type
+      status: EquipmentStatus.AVAILABLE,
+      size: 'L', // Valeur par défaut
+      barcode: '',
+      imageUrl: ''
+    };
+    setAiDraftItem(draft);
+    setIsAiScanning(false);
+    setIsAdding(true); // Réouverture du modal d'ajout
+  };
+
+  const handleOpenAdd = () => {
+    setAiDraftItem(null);
+    setIsAdding(true);
+  };
+
   return (
     <div className="h-full flex flex-col bg-slate-50/50">
       <StockHeader 
@@ -49,8 +75,7 @@ export const StockManager: React.FC<StockManagerProps> = ({
         filter={filter}
         onFilterChange={setFilter}
         onScanClick={() => setIsScanning(true)}
-        onAddClick={() => setIsAdding(true)}
-        // On passe le rôle ici. Si currentUser est null (chargement), on force 'pompier' par sécurité pour masquer le bouton.
+        onAddClick={handleOpenAdd}
         userRole={currentUser?.role || 'pompier'}
       />
 
@@ -63,40 +88,56 @@ export const StockManager: React.FC<StockManagerProps> = ({
         />
       </div>
 
+      {/* Modal d'Ajout (Nouveau ou après scan IA) */}
       {isAdding && (
         <AddItemModal 
           onClose={() => setIsAdding(false)}
-          onSave={(item) => {
+          onAdd={(item) => {
             onAddEquipment(item);
             setIsAdding(false);
           }}
-          mode="create"
+          onScanRequest={() => {
+            setIsAdding(false);
+            setIsAiScanning(true);
+          }}
+          initialItem={aiDraftItem}
         />
       )}
 
+      {/* Modal d'Édition */}
       {editingItem && (
         <AddItemModal 
-          initialData={editingItem}
+          initialItem={editingItem}
           onClose={() => setEditingItem(null)}
-          onSave={(item) => {
+          onAdd={() => {}} // Non utilisé en mode édition
+          onUpdate={(item) => {
             onUpdateEquipment(item);
             setEditingItem(null);
           }}
-          onDelete={() => {
-            onDeleteEquipment(editingItem.id);
+          onDelete={(id) => {
+            onDeleteEquipment(id);
             setEditingItem(null);
           }}
-          mode="edit"
+          onScanRequest={() => {}} // Pas de scan en mode édition
         />
       )}
 
+      {/* Scanner Code-barres pour la recherche */}
       {isScanning && (
-        <Scanner 
+        <BarcodeScanner 
           onScan={(code) => {
             setSearch(code);
             setIsScanning(false);
           }}
           onClose={() => setIsScanning(false)}
+        />
+      )}
+
+      {/* Scanner IA pour l'identification d'équipement */}
+      {isAiScanning && (
+        <ScannerAI 
+          onClose={() => setIsAiScanning(false)}
+          onIdentified={handleAiIdentified}
         />
       )}
     </div>
