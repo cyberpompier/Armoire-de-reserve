@@ -64,13 +64,13 @@ export const StockManager: React.FC<StockManagerProps> = ({
                     id: Date.now().toString(),
                     type: type as any,
                     barcode,
-                    size: size || 'N/A', // Correction: fallback sur string car size est requis
+                    size: size || undefined,
                     status: EquipmentStatus.AVAILABLE,
                     condition: 'Neuf'
                 });
             }
         }}
-        userRole={currentUser?.role}
+        userRole={currentUser?.role} // CRUCIAL FIX: Passing the role
       />
 
       <div className="p-4 space-y-3">
@@ -121,8 +121,7 @@ export const StockManager: React.FC<StockManagerProps> = ({
                    <button 
                      onClick={() => {
                          const newCond = prompt('Nouvel état ?', item.condition);
-                         // Correction: cast explicite car string != 'Neuf' | 'Bon'...
-                         if(newCond) onUpdateEquipment({...item, condition: newCond as any});
+                         if(newCond) onUpdateEquipment({...item, condition: newCond});
                      }}
                      className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
                    >
