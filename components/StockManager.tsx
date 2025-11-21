@@ -1,143 +1,182 @@
-import React, { useState, useMemo } from 'react';
-import { AppState, Equipment, Transaction, User, EquipmentStatus, EquipmentType } from '../types';
-import { StockHeader } from './StockHeader';
-import { EquipmentList } from './EquipmentList';
-import { AddItemModal } from './AddItemModal';
-import { BarcodeScanner } from './BarcodeScanner';
+import React, { useState } from 'react';
+import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
 import { ScannerAI } from './ScannerAI';
+import { BarcodeScanner } from './BarcodeScanner';
+import { StockHeader } from './StockHeader';
+import { StockList } from './StockList';
+import { AddItemModal } from './AddItemModal';
+import { ActionModal } from './ActionModal';
 
 interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
   onAddEquipment: (eq: Equipment) => void;
   onUpdateEquipment: (eq: Equipment) => void;
-  onDeleteEquipment: (id: string) => void;
-  onTransaction: (t: Transaction, s: EquipmentStatus, u?: string) => void;
+  onDeleteEquipment: (itemId: string) => void;
+  onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
 }
 
-export const StockManager: React.FC<StockManagerProps> = ({
-  state,
-  currentUser,
-  onAddEquipment,
-  onUpdateEquipment,
-  onDeleteEquipment,
-  onTransaction
-}) => {
+export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onUpdateEquipment, onDeleteEquipment, onTransaction }) => {
+  const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('ALL');
-  const [isScanning, setIsScanning] = useState(false); // Scanner Code-barres (Recherche)
-  const [isAiScanning, setIsAiScanning] = useState(false); // Scanner IA (Ajout)
-  const [isAdding, setIsAdding] = useState(false);
-  const [editingItem, setEditingItem] = useState<Equipment | null>(null);
+  const [showScanner, setShowScanner] = useState(false); // AI Scanner
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false); // Barcode Scanner
   
-  // Stocke les données trouvées par l'IA pour pré-remplir le formulaire
-  const [aiDraftItem, setAiDraftItem] = useState<Equipment | null>(null);
+  const [selectedItem, setSelectedItem] = useState<Equipment | null>(null);
+  const [editingItem, setEditingItem] = useState<Equipment | null>(null); // Item being edited
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
-  const filteredInventory = useMemo(() => {
-    return state.inventory.filter(item => {
-      const matchesSearch = search === '' || 
-        item.type.toLowerCase().includes(search.toLowerCase()) ||
-        item.barcode.toLowerCase().includes(search.toLowerCase()) ||
-        (item.assignedTo && state.users.find(u => u.id === item.assignedTo)?.name.toLowerCase().includes(search.toLowerCase()));
-      
-      const matchesFilter = filter === 'ALL' || item.status === filter;
-      
-      return matchesSearch && matchesFilter;
-    });
-  }, [state.inventory, search, filter, state.users]);
+  // Filter logic
+  const filteredItems = state.inventory.filter(item => {
+    const matchesFilter = filter === 'ALL' || item.status === filter;
+    const matchesSearch = item.type.toLowerCase().includes(search.toLowerCase()) || 
+                          item.barcode.includes(search) || 
+                          (item.assignedTo && state.users.find(u => u.id === item.assignedTo)?.name.toLowerCase().includes(search.toLowerCase()));
+    return matchesFilter && matchesSearch;
+  });
 
-  const handleAiIdentified = (type: EquipmentType, condition: string) => {
-    // Création d'un objet temporaire avec les infos de l'IA
-    const draft: Equipment = {
-      id: '',
-      type: type,
-      condition: condition as any, // Cast car string vs literal type
-      status: EquipmentStatus.AVAILABLE,
-      size: 'L', // Valeur par défaut
-      barcode: '',
-      imageUrl: ''
-    };
-    setAiDraftItem(draft);
-    setIsAiScanning(false);
-    setIsAdding(true); // Réouverture du modal d'ajout
+  // Sound Feedback
+  const playBeep = () => {
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.type = 'sine';
+      osc.frequency.value = 1000; // 1000Hz beep
+      gain.gain.value = 0.1; // Volume bas
+
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15); // 150ms duration
+    } catch (e) {
+      console.error("Audio play failed", e);
+    }
   };
 
-  const handleOpenAdd = () => {
-    setAiDraftItem(null);
-    setIsAdding(true);
+  const handleAiIdentify = (type: EquipmentType, condition: string) => {
+    playBeep();
+    // Create new item from scan
+    const newItem: Equipment = {
+      id: Date.now().toString(),
+      type,
+      size: 'L', // Default
+      barcode: `GEN-${Date.now().toString().slice(-6)}`,
+      status: EquipmentStatus.AVAILABLE,
+      condition: condition as 'Neuf'|'Bon'|'Usé'|'Critique',
+      imageUrl: `https://picsum.photos/200?random=${Date.now()}`
+    };
+    onAddEquipment(newItem);
+  };
+
+  const handleBarcodeFound = (code: string) => {
+    // Try to find item in inventory
+    const foundItem = state.inventory.find(item => item.barcode === code);
+    
+    if (foundItem) {
+      playBeep();
+      // Item found: Open action modal directly
+      setShowBarcodeScanner(false);
+      setSelectedItem(foundItem);
+      setShowActionModal(true);
+    } else {
+      alert(`Équipement introuvable avec le code : ${code}`);
+      setShowBarcodeScanner(false);
+      setSearch(code);
+    }
+  };
+
+  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
+    if (!selectedItem) return;
+
+    const transaction: any = {
+      id: Date.now().toString(),
+      equipmentId: selectedItem.id,
+      userId: action === 'LOAN' && userId ? userId : (selectedItem.assignedTo || 'SYSTEM'),
+      type: action === 'LOAN' ? 'OUT' : 'IN',
+      timestamp: Date.now(),
+      note: note?.trim(),
+      reason: action === 'LOAN' ? reason : undefined
+    };
+
+    const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
+    onTransaction(transaction, newStatus, action === 'LOAN' ? userId : undefined);
+    setShowActionModal(false);
+    setSelectedItem(null);
   };
 
   return (
-    <div className="h-full flex flex-col bg-slate-50/50">
+    <div className="pb-6 animate-fade-in">
+      {showScanner && (
+        <ScannerAI 
+          onClose={() => setShowScanner(false)} 
+          onIdentified={handleAiIdentify} 
+        />
+      )}
+
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          onClose={() => setShowBarcodeScanner(false)}
+          onScan={handleBarcodeFound}
+        />
+      )}
+
       <StockHeader 
         search={search}
         onSearchChange={setSearch}
         filter={filter}
         onFilterChange={setFilter}
-        onScanClick={() => setIsScanning(true)}
-        onAddClick={handleOpenAdd}
-        userRole={currentUser?.role || 'pompier'}
+        onScanClick={() => setShowBarcodeScanner(true)}
+        onAddClick={() => {
+          setEditingItem(null); // Ensure we are in Add mode
+          setShowAddModal(true);
+        }}
       />
 
-      <div className="flex-1 overflow-y-auto p-4 pb-20">
-        <EquipmentList 
-          items={filteredInventory}
-          users={state.users}
-          currentUser={currentUser}
-          onEdit={setEditingItem}
-        />
-      </div>
+      <StockList 
+        items={filteredItems}
+        users={state.users}
+        onItemClick={(item) => {
+          setSelectedItem(item);
+          setShowActionModal(true);
+        }}
+      />
 
-      {/* Modal d'Ajout (Nouveau ou après scan IA) */}
-      {isAdding && (
+      {showAddModal && (
         <AddItemModal 
-          onClose={() => setIsAdding(false)}
-          onAdd={(item) => {
-            onAddEquipment(item);
-            setIsAdding(false);
+          onClose={() => {
+            setShowAddModal(false);
+            setEditingItem(null);
           }}
-          onScanRequest={() => {
-            setIsAdding(false);
-            setIsAiScanning(true);
-          }}
-          initialItem={aiDraftItem}
-        />
-      )}
-
-      {/* Modal d'Édition */}
-      {editingItem && (
-        <AddItemModal 
+          onAdd={onAddEquipment}
+          onUpdate={onUpdateEquipment}
+          onDelete={onDeleteEquipment}
           initialItem={editingItem}
-          onClose={() => setEditingItem(null)}
-          onAdd={() => {}} // Non utilisé en mode édition
-          onUpdate={(item) => {
-            onUpdateEquipment(item);
-            setEditingItem(null);
-          }}
-          onDelete={(id) => {
-            onDeleteEquipment(id);
-            setEditingItem(null);
-          }}
-          onScanRequest={() => {}} // Pas de scan en mode édition
+          onScanRequest={() => setShowScanner(true)}
         />
       )}
 
-      {/* Scanner Code-barres pour la recherche */}
-      {isScanning && (
-        <BarcodeScanner 
-          onScan={(code) => {
-            setSearch(code);
-            setIsScanning(false);
+      {showActionModal && (
+        <ActionModal 
+          isOpen={showActionModal}
+          onClose={() => setShowActionModal(false)}
+          item={selectedItem}
+          currentUser={currentUser}
+          users={state.users}
+          transactions={state.transactions}
+          onAction={handleAction}
+          onEdit={(item) => {
+            setShowActionModal(false); // Close view modal
+            setSelectedItem(null);
+            setEditingItem(item); // Set item to edit
+            setShowAddModal(true); // Open edit modal (which is AddItemModal)
           }}
-          onClose={() => setIsScanning(false)}
-        />
-      )}
-
-      {/* Scanner IA pour l'identification d'équipement */}
-      {isAiScanning && (
-        <ScannerAI 
-          onClose={() => setIsAiScanning(false)}
-          onIdentified={handleAiIdentified}
         />
       )}
     </div>
