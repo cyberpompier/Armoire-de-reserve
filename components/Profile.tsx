@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2 } from 'lucide-react';
+import { showSuccess, showError, showLoading, dismissToast } from '../utils/toast';
 
 interface UserProfile {
   nom: string | null;
@@ -80,7 +81,9 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
     const user = session?.user;
     if (!user) return;
     
+    const loadingToastId = showLoading('Sauvegarde du profil...');
     setSaving(true);
+    
     try {
       const updates = {
         id: user.id, // Requis pour upsert (création)
@@ -101,9 +104,12 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
 
       setProfile({ ...formData, email: user.email || null, avatar: profile?.avatar || null });
       setIsEditing(false);
+      dismissToast(loadingToastId);
+      showSuccess('Profil mis à jour avec succès !');
     } catch (error: any) {
+      dismissToast(loadingToastId);
       console.error('Erreur lors de la mise à jour:', error);
-      alert('Erreur lors de la sauvegarde du profil : ' + error.message);
+      showError('Erreur lors de la sauvegarde du profil : ' + error.message);
     } finally {
       setSaving(false);
     }
@@ -130,7 +136,7 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
           <p className="text-slate-500 text-sm">Compte personnel</p>
        </header>
 
-       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col items-center text-center">
+       <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 flex flex-col items-center text-center">
           {profile?.avatar ? (
             <img 
               src={profile.avatar} 
