@@ -10,27 +10,20 @@ import { Session } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
 import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
 
-// Mock Initial Data (utilisé uniquement si pas de données)
-const INITIAL_STATE: AppState = {
-  inventory: [], // Start empty, data will be fetched from Supabase
-  users: [],
-  transactions: [] // Start empty, data will be fetched from Supabase
-};
+const INITIAL_STATE: AppState = { inventory: [], users: [], transactions: [] };
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoadingData, setIsLoadingData] = useState(true);
-
-  // --- Data Fetching Functions ---
 
   const fetchInitialData = useCallback(async () => {
     setIsLoadingData(true);
     try {
       const [usersRes, inventoryRes, transactionsRes] = await Promise.all([
-        supabase.from('profiles').select('*').order('nom', { ascending: true }),
+        supabase.from('profiles').select('*'),
         supabase.from('armoire_equipment').select('*'),
         supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
       ]);
@@ -40,12 +33,8 @@ const App: React.FC = () => {
       if (transactionsRes.error) throw transactionsRes.error;
 
       const directory: User[] = usersRes.data.map((p: any) => ({
-        id: p.id,
-        matricule: p.matricule || 'N/A',
-        name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
-        rank: p.grade || '',
-        role: p.role || 'pompier',
-        email: p.email
+        id: p.id, name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Inconnu',
+        rank: p.grade || '', role: p.role || 'pompier', email: p.email
       }));
 
       setState({
@@ -53,9 +42,7 @@ const App: React.FC = () => {
         inventory: inventoryRes.data as Equipment[],
         transactions: transactionsRes.data as Transaction[]
       });
-
     } catch (e) {
-      console.error("Erreur lors du chargement des données initiales:", e);
       showError("Erreur de chargement des données");
     } finally {
       setIsLoadingData(false);
@@ -63,100 +50,68 @@ const App: React.FC = () => {
   }, []);
 
   const fetchUserProfile = useCallback(async (userId: string, email?: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (data && !error) {
-        const userProfile: User = {
-          id: userId,
-          email: email,
-          matricule: data.matricule || 'N/A',
-          name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
-          rank: data.grade || 'Sapeur',
-          role: data.role || 'pompier'
-        };
-        setCurrentUser(userProfile);
-      } else {
-         // Create a fallback profile if none exists
-         setCurrentUser({ id: userId, email: email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
-      }
-    } catch (err) {
-      console.error("Error fetching profile:", err);
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    if (data) {
+      setCurrentUser({
+        id: userId, email, name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
+        rank: data.grade || 'Sapeur', role: data.role || 'pompier'
+      });
+    } else {
+      setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
     }
   }, []);
 
-  // --- Auth Session Management ---
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        await fetchUserProfile(session.user.id, session.user.email);
-        await fetchInitialData();
+        fetchUserProfile(session.user.id, session.user.email);
+        fetchInitialData();
       } else {
-        setCurrentUser(null);
-        setState(INITIAL_STATE); // Clear state on logout
+        setIsLoadingData(false);
       }
     });
 
-    // Initial load
-    supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-            setSession(session)
-            fetchUserProfile(session.user.id, session.user.email);
-            fetchInitialData();
-        }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchUserProfile(session.user.id, session.user.email);
+        fetchInitialData();
+      } else {
+        setCurrentUser(null);
+        setState(INITIAL_STATE);
+      }
     });
-
     return () => subscription.unsubscribe();
   }, [fetchUserProfile, fetchInitialData]);
 
-  // --- CRUD Operations (Efficient State Updates) ---
-
-  const handleTransaction = async (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
-    const loadingToastId = showLoading(`Enregistrement...`);
+  const handleTransaction = async (transactions: Transaction[], newStatus: EquipmentStatus, assigneeId?: string) => {
+    const loadingToastId = showLoading("Enregistrement...");
     try {
-      // 1. Update Equipment in DB and get the updated record back
-      const { data: updatedEquipment, error: updateError } = await supabase
+      const equipmentIds = transactions.map(t => t.equipmentId);
+      
+      const { data: updatedItems, error: updateError } = await supabase
         .from('armoire_equipment')
-        .update({ 
-          status: newStatus, 
-          assignedTo: newStatus === EquipmentStatus.LOANED ? assigneeId : null,
-          lastInspection: new Date().toISOString()
-        })
-        .eq('id', newTrans.equipmentId)
-        .select()
-        .single();
-
+        .update({ status: newStatus, assignedTo: newStatus === EquipmentStatus.LOANED ? assigneeId : null })
+        .in('id', equipmentIds)
+        .select();
       if (updateError) throw updateError;
 
-      // 2. Insert Transaction record
-      const { error: transError } = await supabase.from('armoire_transactions').insert({
-        id: newTrans.id,
-        equipmentId: newTrans.equipmentId,
-        userId: newTrans.userId,
-        type: newTrans.type,
-        timestamp: new Date(newTrans.timestamp).toISOString(),
-        note: newTrans.note,
-        reason: (newTrans as any).reason,
-      });
-
+      const transactionData = transactions.map(t => ({ ...t, timestamp: new Date(t.timestamp).toISOString() }));
+      const { error: transError } = await supabase.from('armoire_transactions').insert(transactionData);
       if (transError) throw transError;
 
-      // 3. Update local state efficiently
       setState(prevState => ({
         ...prevState,
-        inventory: prevState.inventory.map(item => 
-          item.id === newTrans.equipmentId ? updatedEquipment as Equipment : item
-        ),
-        transactions: [newTrans, ...prevState.transactions] // Add to top of the list
+        inventory: prevState.inventory.map(item => {
+          const updated = updatedItems.find(u => u.id === item.id);
+          return updated ? updated as Equipment : item;
+        }),
+        transactions: [...transactions, ...prevState.transactions]
       }));
       
       dismissToast(loadingToastId);
-      showSuccess(`Opération réussie !`);
+      showSuccess("Opération réussie !");
     } catch (error: any) {
       dismissToast(loadingToastId);
       showError(`Erreur: ${error.message}`);
@@ -164,104 +119,78 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddEquipment = async (eq: Equipment) => {
-    const loadingToastId = showLoading("Ajout de l'équipement...");
+  const handleAddEquipment = async (eq: Equipment, pairBarcode?: string) => {
+    const toastId = showLoading("Ajout en cours...");
     try {
-      const { data: existing, error: checkError } = await supabase
-        .from('armoire_equipment').select('id').eq('barcode', eq.barcode).maybeSingle();
-      if (checkError) throw checkError;
-      if (existing) throw new Error("Ce code-barres existe déjà.");
+      let pairId: string | undefined = undefined;
+      if (pairBarcode) {
+        const { data: pairedItem } = await supabase.from('armoire_equipment').select('id').eq('barcode', pairBarcode).single();
+        if (!pairedItem) throw new Error(`Le gant avec le code-barres ${pairBarcode} est introuvable.`);
+        pairId = pairedItem.id;
+      }
 
-      const { data: newEquipment, error: insertError } = await supabase
-        .from('armoire_equipment')
-        .insert(eq)
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      setState(prevState => ({
-        ...prevState,
-        inventory: [...prevState.inventory, newEquipment as Equipment]
-      }));
-
-      dismissToast(loadingToastId);
-      showSuccess(`Équipement ajouté.`);
-    } catch (error: any) {
-      dismissToast(loadingToastId);
-      showError(`Erreur: ${error.message}`);
-      throw error;
-    }
-  };
-
-  const handleUpdateEquipment = async (updatedItem: Equipment) => {
-    const loadingToastId = showLoading("Mise à jour...");
-    try {
-      const { data: returnedItem, error } = await supabase
-        .from('armoire_equipment')
-        .update(updatedItem)
-        .eq('id', updatedItem.id)
-        .select()
-        .single();
-
+      const { data: newEquipment, error } = await supabase.from('armoire_equipment').insert({ ...eq, pairId }).select().single();
       if (error) throw error;
 
-      setState(prevState => ({
-        ...prevState,
-        inventory: prevState.inventory.map(item => 
-          item.id === updatedItem.id ? returnedItem as Equipment : item
-        )
-      }));
-
-      dismissToast(loadingToastId);
-      showSuccess(`Équipement mis à jour.`);
+      if (pairId) {
+        await supabase.from('armoire_equipment').update({ pairId: newEquipment.id }).eq('id', pairId);
+        await fetchInitialData(); // Refresh all data to ensure consistency
+      } else {
+        setState(prev => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
+      }
+      
+      dismissToast(toastId);
+      showSuccess("Équipement ajouté.");
     } catch (error: any) {
-      dismissToast(loadingToastId);
-      showError(`Erreur: ${error.message}`);
+      dismissToast(toastId);
+      showError(error.message);
+      throw error;
+    }
+  };
+
+  const handleUpdateEquipment = async (updatedItem: Equipment, pairBarcode?: string) => {
+    const toastId = showLoading("Mise à jour...");
+    try {
+      let pairId: string | undefined = undefined;
+      if (pairBarcode) {
+        const { data: pairedItem } = await supabase.from('armoire_equipment').select('id').eq('barcode', pairBarcode).single();
+        if (!pairedItem) throw new Error(`Le gant avec le code-barres ${pairBarcode} est introuvable.`);
+        if (pairedItem.id === updatedItem.id) throw new Error("Ne peut pas se lier à lui-même.");
+        pairId = pairedItem.id;
+      }
+
+      const { data: returnedItem, error } = await supabase.from('armoire_equipment').update({ ...updatedItem, pairId }).eq('id', updatedItem.id).select().single();
+      if (error) throw error;
+
+      if (pairId) {
+        await supabase.from('armoire_equipment').update({ pairId: returnedItem.id }).eq('id', pairId);
+      }
+      
+      await fetchInitialData(); // Easiest way to sync state after complex update
+      dismissToast(toastId);
+      showSuccess("Équipement mis à jour.");
+    } catch (error: any) {
+      dismissToast(toastId);
+      showError(error.message);
       throw error;
     }
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
-    const loadingToastId = showLoading("Suppression...");
-    try {
-      const { error } = await supabase.from('armoire_equipment').delete().eq('id', itemId);
-      if (error) throw error;
-
-      setState(prevState => ({
-        ...prevState,
-        inventory: prevState.inventory.filter(item => item.id !== itemId)
-      }));
-
-      dismissToast(loadingToastId);
-      showSuccess("Équipement supprimé.");
-    } catch (error: any) {
-      dismissToast(loadingToastId);
-      showError(`Erreur: ${error.message}`);
-      throw error;
-    }
+    // This needs to be enhanced to handle un-pairing
+    await supabase.from('armoire_equipment').delete().eq('id', itemId);
+    await fetchInitialData();
+    showSuccess("Équipement supprimé.");
   };
 
-  if (!session) {
-    return <Login />;
-  }
-  
-  if (isLoadingData) {
-    return (
-      <div className="h-full w-full flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center text-slate-500">
-          <LayoutDashboard className="w-8 h-8 animate-pulse mb-2" />
-          <p className="text-sm font-medium">Chargement des données...</p>
-        </div>
-      </div>
-    );
-  }
+  if (isLoadingData) return <div>Chargement...</div>;
+  if (!session) return <Login />;
 
   return (
-    <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
+    <div className="h-full w-full bg-slate-50 flex justify-center">
       <ToastProvider />
-      <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
-        <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
+      <main className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col">
+        <div className="flex-1 overflow-y-auto bg-slate-50/50">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
           {activeTab === 'stock' && (
             <StockManager 
@@ -274,65 +203,19 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'profile' && <Profile session={session} />}
-          {activeTab === 'settings' && (
-             <div className="p-6 flex flex-col items-center justify-center min-h-full text-slate-400">
-               <Settings className="w-16 h-16 mb-4 opacity-20" />
-               <h2 className="text-lg font-medium">Paramètres</h2>
-               <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
-             </div>
-          )}
         </div>
-
-        <nav className="shrink-0 bg-white border-t border-slate-100 px-6 py-2 pb-safe flex justify-between items-center z-30 w-full shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <button 
-            onClick={() => setActiveTab('dashboard')}
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
-              activeTab === 'dashboard' ? 'text-fire-600 scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <LayoutDashboard className={`w-6 h-6 ${activeTab === 'dashboard' && 'fill-current'}`} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Accueil</span>
+        <nav className="shrink-0 bg-white border-t px-6 py-2 flex justify-between">
+          <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-fire-600' : 'text-slate-400'}>
+            <LayoutDashboard /> <span className="text-xs">Accueil</span>
           </button>
-
-          <button 
-            onClick={() => setActiveTab('stock')}
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
-              activeTab === 'stock' ? 'text-fire-600 scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <PackageSearch className={`w-6 h-6 ${activeTab === 'stock' && 'fill-fire-100'}`} strokeWidth={activeTab === 'stock' ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Stock</span>
+          <button onClick={() => setActiveTab('stock')} className={activeTab === 'stock' ? 'text-fire-600' : 'text-slate-400'}>
+            <PackageSearch /> <span className="text-xs">Stock</span>
           </button>
-
-          <button 
-            onClick={() => setActiveTab('profile')}
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
-              activeTab === 'profile' ? 'text-fire-600 scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <UserCircle className={`w-6 h-6 ${activeTab === 'profile' && 'fill-current'}`} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Profil</span>
-          </button>
-
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${
-              activeTab === 'settings' ? 'text-fire-600 scale-105' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Settings className="w-6 h-6" strokeWidth={activeTab === 'settings' ? 2.5 : 2} />
-            <span className="text-[10px] font-medium">Options</span>
+          <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'text-fire-600' : 'text-slate-400'}>
+            <UserCircle /> <span className="text-xs">Profil</span>
           </button>
         </nav>
-
       </main>
-      <style>{`
-        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
-        .animate-fade-in { animation: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        .animate-slide-up { animation: slide-up 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-      `}</style>
     </div>
   );
 };

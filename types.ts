@@ -34,6 +34,7 @@ export interface Equipment {
   lastInspection?: string;
   condition: 'Neuf' | 'Bon' | 'Usé' | 'Critique';
   imageUrl?: string;
+  pairId?: string; // ID of the other item in the pair
 }
 
 export interface Transaction {
