@@ -85,6 +85,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     }
   };
 
+  const handleScanButtonClick = () => {
+    onScanRequest();
+    onClose();
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
@@ -110,7 +115,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                    placeholder="Ex: 2024GCD000494"
                    className="w-full p-2.5 pr-10 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono placeholder:font-sans"
                  />
-                 <button onClick={onScanRequest} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-slate-200 hover:bg-slate-300 rounded-md text-slate-600">
+                 <button onClick={handleScanButtonClick} className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 bg-slate-200 hover:bg-slate-300 rounded-md text-slate-600">
                    <ScanLine className="w-4 h-4" />
                  </button>
                </div>
