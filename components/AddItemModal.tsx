@@ -21,18 +21,22 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   
-  // Nouvel état pour gérer la soumission et éviter les doubles clics
+  // Nouvel état pour gérer la soumission
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = !!initialItem;
+
+  // Générateur d'ID simple et compatible tous navigateurs
+  const generateId = () => {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  };
 
   const handleSave = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      // Génération d'ID plus robuste pour éviter les collisions
-      const newItemId = initialItem?.id || (crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+      const newItemId = initialItem?.id || generateId();
 
       const itemData: Equipment = {
         id: newItemId,
@@ -50,15 +54,23 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       } else {
         await onAdd(itemData);
       }
+      
+      // Si tout s'est bien passé, on ferme
       onClose();
+      
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde", error);
+      console.error("Erreur lors de la sauvegarde dans le modal:", error);
+      // On ne ferme PAS le modal en cas d'erreur pour permettre de corriger
+      // L'erreur est déjà affichée par App.tsx (alert)
+    } finally {
+      // Quoi qu'il arrive (succès ou erreur), on débloque le bouton
       setIsSubmitting(false);
     }
   };
 
   const handleDelete = () => {
     if (initialItem && onDelete) {
+      // Pour la suppression, on ferme directement (optimiste)
       onDelete(initialItem.id);
       onClose();
     }

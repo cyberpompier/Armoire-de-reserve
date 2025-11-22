@@ -190,6 +190,7 @@ const App: React.FC = () => {
       console.error("Erreur transaction DB:", err);
       alert(`Erreur de sauvegarde : ${err.message || 'Inconnue'}`);
       fetchSharedData(); // Rollback en cas d'erreur
+      throw err; // PROPAGATION DE L'ERREUR
     }
   };
 
@@ -219,11 +220,14 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error("Erreur ajout DB:", err);
       alert(`Impossible d'ajouter l'équipement : ${err.message || 'Erreur inconnue'}`);
-      // Optionnel : Retirer l'item de la liste si échec
+      
+      // Rollback
       setState(prev => ({
         ...prev,
         inventory: prev.inventory.filter(i => i.id !== eq.id)
       }));
+      
+      throw err; // PROPAGATION : Important pour que le modal sache qu'il y a eu une erreur
     }
   };
 
@@ -253,6 +257,7 @@ const App: React.FC = () => {
       console.error("Erreur update DB:", err);
       alert(`Erreur de mise à jour : ${err.message}`);
       fetchSharedData(); // Rollback
+      throw err; // PROPAGATION
     }
   };
 
@@ -271,6 +276,7 @@ const App: React.FC = () => {
       console.error("Erreur delete DB:", err);
       alert(`Erreur de suppression : ${err.message}`);
       fetchSharedData(); // Rollback
+      throw err; // PROPAGATION
     }
   };
 
