@@ -48,8 +48,10 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
                     // Arrêter le flux vidéo tout de suite pour figer l'image et libérer les ressources
                     codeReader.current.reset(); 
                     
-                    // Appeler le callback parent
-                    onScan(text);
+                    // Appeler le callback parent avec un délai pour le feedback visuel
+                    setTimeout(() => {
+                        onScan(text);
+                    }, 1000);
                 }
                 if (err && !(err instanceof NotFoundException)) {
                    // Silence sur les erreurs de frame vide
