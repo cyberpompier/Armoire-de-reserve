@@ -10,9 +10,9 @@ import { ActionModal } from './ActionModal';
 interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
-  onAddEquipment: (eq: Equipment) => void;
-  onUpdateEquipment: (eq: Equipment) => void;
-  onDeleteEquipment: (itemId: string) => void;
+  onAddEquipment: (eq: Equipment) => Promise<void>;
+  onUpdateEquipment: (eq: Equipment) => Promise<void>;
+  onDeleteEquipment: (itemId: string) => Promise<void>;
   onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => Promise<void>;
 }
 
@@ -100,7 +100,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
       : selectedItem.assignedTo || currentUser.id;
 
     const transaction: Transaction = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       equipmentId: selectedItem.id,
       userId: transactionUserId,
       type: action === 'LOAN' ? 'OUT' : 'IN',

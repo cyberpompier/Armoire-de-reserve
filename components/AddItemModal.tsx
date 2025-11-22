@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentStatus, EquipmentType } from '../types';
-import { ScanLine, X, Pencil, Trash2, AlertTriangle } from 'lucide-react';
+import { ScanLine, X, Pencil, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface AddItemModalProps {
   onClose: () => void;
-  onAdd: (item: Equipment) => void;
-  onUpdate?: (item: Equipment) => void;
-  onDelete?: (itemId: string) => void;
+  onAdd: (item: Equipment) => Promise<void>;
+  onUpdate?: (item: Equipment) => Promise<void>;
+  onDelete?: (itemId: string) => Promise<void>;
   initialItem?: Equipment | null;
   onScanRequest: () => void;
 }
@@ -20,16 +20,18 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isEditing = !!initialItem;
 
-  const handleSave = () => {
-    // Validation du code-barres
+  const handleSave = async () => {
     if (!newItemBarcode.trim()) {
       alert("Veuillez saisir un code-barres ou un identifiant.");
       return;
     }
 
+    setIsSaving(true);
     const itemData: Equipment = {
       id: initialItem?.id || crypto.randomUUID(),
       type: newItemType,
@@ -41,18 +43,32 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
     };
 
-    if (isEditing && onUpdate) {
-      onUpdate(itemData);
-    } else {
-      onAdd(itemData);
+    try {
+      if (isEditing && onUpdate) {
+        await onUpdate(itemData);
+      } else {
+        await onAdd(itemData);
+      }
+      onClose();
+    } catch (error) {
+      console.error("Save failed in modal:", error);
+      // Error toast is shown in App.tsx
+    } finally {
+      setIsSaving(false);
     }
-    onClose();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (initialItem && onDelete) {
-      onDelete(initialItem.id);
-      onClose();
+      setIsDeleting(true);
+      try {
+        await onDelete(initialItem.id);
+        onClose();
+      } catch (error) {
+        console.error("Delete failed in modal:", error);
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -162,10 +178,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
           <button 
             onClick={handleSave}
-            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2 flex items-center justify-center gap-2"
+            disabled={isSaving}
+            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2 flex items-center justify-center gap-2 disabled:opacity-70"
           >
-            {isEditing && <Pencil className="w-4 h-4" />}
-            {isEditing ? 'Mettre à jour' : 'Créer l\'équipement'}
+            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEditing && <Pencil className="w-4 h-4" />)}
+            {isSaving ? 'Enregistrement...' : (isEditing ? 'Mettre à jour' : 'Créer l\'équipement')}
           </button>
 
           {/* Delete Button */}
@@ -194,9 +211,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                      </button>
                      <button 
                        onClick={handleDelete}
-                       className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-sm"
+                       disabled={isDeleting}
+                       className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-sm disabled:opacity-70"
                      >
-                       Confirmer
+                       {isDeleting ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Confirmer'}
                      </button>
                    </div>
                 </div>
