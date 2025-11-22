@@ -6,6 +6,7 @@ import { StockHeader } from './StockHeader';
 import { StockList } from './StockList';
 import { AddItemModal } from './AddItemModal';
 import { ActionModal } from './ActionModal';
+import { showError } from '../utils/toast';
 
 interface StockManagerProps {
   state: AppState;
@@ -86,7 +87,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
       setSelectedItem(foundItem);
       setShowActionModal(true);
     } else {
-      alert(`Équipement introuvable avec le code : ${code}`);
+      showError(`Équipement introuvable avec le code : ${code}`);
       setShowBarcodeScanner(false);
       setSearch(code);
     }

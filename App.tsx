@@ -7,6 +7,8 @@ import { Login } from './components/Login';
 import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
+import { ToastProvider } from './components/ToastProvider';
+import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
 
 // Mock Initial Data (utilisé uniquement si pas de données)
 const INITIAL_STATE: AppState = {
@@ -141,6 +143,8 @@ const App: React.FC = () => {
 
   const handleTransaction = async (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
     if (!currentUser) return;
+    
+    const loadingToastId = showLoading(`Enregistrement de la ${newTrans.type === 'OUT' ? 'sortie' : 'retour'}...`);
 
     try {
       // 1. Update Equipment Status
@@ -171,17 +175,21 @@ const App: React.FC = () => {
       if (transError) throw transError;
 
       // 3. Update local state (optimistic update or re-fetch)
-      // For simplicity and consistency, we re-fetch all data after a successful transaction
       await fetchInventoryAndTransactions();
+      
+      dismissToast(loadingToastId);
+      showSuccess(`Opération réussie : ${newTrans.type === 'OUT' ? 'Équipement sorti' : 'Équipement retourné'}.`);
 
-    } catch (error) {
+    } catch (error: any) {
+      dismissToast(loadingToastId);
       console.error("Erreur lors de la transaction:", error);
-      alert("Erreur lors de l'enregistrement de la transaction.");
+      showError(`Erreur lors de l'enregistrement de la transaction: ${error.message || 'Inconnue'}`);
       throw error; // Re-throw to notify modal/component
     }
   };
 
   const handleAddEquipment = async (eq: Equipment) => {
+    const loadingToastId = showLoading("Ajout de l'équipement...");
     try {
       const { error } = await supabase
         .from('armoire_equipment')
@@ -200,14 +208,18 @@ const App: React.FC = () => {
       
       // Update local state
       await fetchInventoryAndTransactions();
-    } catch (error) {
+      dismissToast(loadingToastId);
+      showSuccess(`Équipement ${eq.type} ajouté avec succès.`);
+    } catch (error: any) {
+      dismissToast(loadingToastId);
       console.error("Erreur lors de l'ajout de l'équipement:", error);
-      alert("Erreur lors de l'ajout de l'équipement. Le code-barres est peut-être déjà utilisé.");
+      showError(`Erreur: Le code-barres est peut-être déjà utilisé. (${error.message || 'Inconnue'})`);
       throw error;
     }
   };
 
   const handleUpdateEquipment = async (updatedItem: Equipment) => {
+    const loadingToastId = showLoading("Mise à jour de l'équipement...");
     try {
       const { error } = await supabase
         .from('armoire_equipment')
@@ -226,14 +238,18 @@ const App: React.FC = () => {
 
       // Update local state
       await fetchInventoryAndTransactions();
-    } catch (error) {
+      dismissToast(loadingToastId);
+      showSuccess(`Équipement ${updatedItem.type} mis à jour.`);
+    } catch (error: any) {
+      dismissToast(loadingToastId);
       console.error("Erreur lors de la mise à jour de l'équipement:", error);
-      alert("Erreur lors de la mise à jour de l'équipement.");
+      showError(`Erreur lors de la mise à jour: ${error.message || 'Inconnue'}`);
       throw error;
     }
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
+    const loadingToastId = showLoading("Suppression de l'équipement...");
     try {
       const { error } = await supabase
         .from('armoire_equipment')
@@ -244,9 +260,12 @@ const App: React.FC = () => {
 
       // Update local state
       await fetchInventoryAndTransactions();
-    } catch (error) {
+      dismissToast(loadingToastId);
+      showSuccess("Équipement supprimé avec succès.");
+    } catch (error: any) {
+      dismissToast(loadingToastId);
       console.error("Erreur lors de la suppression de l'équipement:", error);
-      alert("Erreur lors de la suppression de l'équipement.");
+      showError(`Erreur lors de la suppression: ${error.message || 'Inconnue'}`);
       throw error;
     }
   };
@@ -268,6 +287,7 @@ const App: React.FC = () => {
 
   return (
     <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
+      <ToastProvider />
       <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
           {activeTab === 'dashboard' && <Dashboard state={state} />}
