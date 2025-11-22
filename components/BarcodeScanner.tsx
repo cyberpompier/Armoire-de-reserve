@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+import { BrowserMultiFormatReader, NotFoundException, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { X, Camera, AlertCircle } from 'lucide-react';
 
 interface BarcodeScannerProps {
@@ -10,7 +10,26 @@ interface BarcodeScannerProps {
 export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const codeReader = useRef(new BrowserMultiFormatReader());
+
+  // Amélioration : Ajout de "hints" pour guider le lecteur de codes-barres
+  const hints = new Map();
+  const formats = [
+    BarcodeFormat.QR_CODE,
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.EAN_8,
+    BarcodeFormat.UPC_A,
+    BarcodeFormat.UPC_E,
+    BarcodeFormat.DATA_MATRIX,
+    BarcodeFormat.ITF,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.CODE_93,
+    BarcodeFormat.PDF_417,
+  ];
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+  hints.set(DecodeHintType.TRY_HARDER, true); // Demande au lecteur de faire plus d'efforts
+
+  const codeReader = useRef(new BrowserMultiFormatReader(hints));
 
   useEffect(() => {
     let isMounted = true;
@@ -24,7 +43,6 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
 
         if (videoRef.current) {
           // Start decoding
-          // Fix: Pass null instead of undefined for deviceId to match strict type signature (string | null)
           codeReader.current.decodeFromVideoDevice(
             null, 
             videoRef.current, 
