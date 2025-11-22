@@ -1,20 +1,20 @@
 -- Table des équipements
-CREATE TABLE public.equipment (
+CREATE TABLE public.armoire_equipement (
     id text PRIMARY KEY,
     type text NOT NULL,
     size text,
     barcode text,
     status text,
     condition text,
-    assigned_to uuid REFERENCES auth.users(id), -- ou profiles(id) si vous utilisez une table profiles liée
+    assigned_to uuid REFERENCES auth.users(id),
     image_url text,
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
 -- Table des transactions (historique)
-CREATE TABLE public.transactions (
+CREATE TABLE public.armoire_transactions (
     id text PRIMARY KEY,
-    equipment_id text REFERENCES public.equipment(id) ON DELETE CASCADE,
+    equipment_id text REFERENCES public.armoire_equipement(id) ON DELETE CASCADE,
     user_id uuid REFERENCES auth.users(id),
     type text, -- 'OUT' ou 'IN'
     timestamp bigint,
@@ -23,13 +23,13 @@ CREATE TABLE public.transactions (
     created_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
--- Activer RLS (Sécurité) - Optionnel : Permettre à tout le monde de lire/écrire pour l'instant (mode simple)
-ALTER TABLE public.equipment ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
+-- Activer RLS
+ALTER TABLE public.armoire_equipement ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.armoire_transactions ENABLE ROW LEVEL SECURITY;
 
--- Politiques simples (tout le monde peut tout faire si authentifié)
-CREATE POLICY "Enable all for authenticated users" ON public.equipment
+-- Politiques de sécurité
+CREATE POLICY "Enable all for authenticated users" ON public.armoire_equipement
     FOR ALL USING (auth.role() = 'authenticated');
 
-CREATE POLICY "Enable all for authenticated users" ON public.transactions
+CREATE POLICY "Enable all for authenticated users" ON public.armoire_transactions
     FOR ALL USING (auth.role() = 'authenticated');

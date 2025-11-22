@@ -54,9 +54,9 @@ const App: React.FC = () => {
   const fetchSharedData = async () => {
     setLoadingData(true);
     try {
-      // 1. Inventaire
+      // 1. Inventaire - Table renommée
       const { data: equipmentData, error: eqError } = await supabase
-        .from('equipment')
+        .from('armoire_equipement')
         .select('*');
       
       if (eqError) throw eqError;
@@ -72,9 +72,9 @@ const App: React.FC = () => {
         imageUrl: e.image_url
       }));
 
-      // 2. Transactions
+      // 2. Transactions - Table renommée
       const { data: transData, error: trError } = await supabase
-        .from('transactions')
+        .from('armoire_transactions')
         .select('*')
         .order('timestamp', { ascending: false });
 
@@ -167,9 +167,9 @@ const App: React.FC = () => {
       transactions: [newTrans, ...prev.transactions]
     }));
 
-    // Écriture DB
+    // Écriture DB - Tables renommées
     try {
-      await supabase.from('transactions').insert({
+      await supabase.from('armoire_transactions').insert({
         id: newTrans.id,
         equipment_id: newTrans.equipmentId,
         user_id: newTrans.userId,
@@ -179,7 +179,7 @@ const App: React.FC = () => {
         note: newTrans.note
       });
 
-      await supabase.from('equipment').update({
+      await supabase.from('armoire_equipement').update({
         status: newStatus,
         assigned_to: assigneeId || null
       }).eq('id', newTrans.equipmentId);
@@ -197,9 +197,9 @@ const App: React.FC = () => {
     }));
     setActiveTab('stock');
 
-    // DB
+    // DB - Table renommée
     try {
-      await supabase.from('equipment').insert({
+      await supabase.from('armoire_equipement').insert({
         id: eq.id,
         type: eq.type,
         size: eq.size,
@@ -223,9 +223,9 @@ const App: React.FC = () => {
       )
     }));
 
-    // DB
+    // DB - Table renommée
     try {
-      await supabase.from('equipment').update({
+      await supabase.from('armoire_equipement').update({
         type: updatedItem.type,
         size: updatedItem.size,
         barcode: updatedItem.barcode,
@@ -246,9 +246,9 @@ const App: React.FC = () => {
       inventory: prev.inventory.filter(item => item.id !== itemId)
     }));
 
-    // DB
+    // DB - Table renommée
     try {
-      await supabase.from('equipment').delete().eq('id', itemId);
+      await supabase.from('armoire_equipement').delete().eq('id', itemId);
     } catch (err) {
       console.error("Erreur delete DB:", err);
     }
