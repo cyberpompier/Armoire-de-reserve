@@ -12,6 +12,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   const [error, setError] = useState<string | null>(null);
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   
+  // Ref pour bloquer les scans multiples immédiatement (plus rapide que le state)
+  const isScanningRef = useRef(false);
+
   // Moteur de scan : Configuration par défaut (éprouvée)
   const codeReader = useRef(new BrowserMultiFormatReader());
 
@@ -25,6 +28,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   const startScan = () => {
     setError(null);
     setScannedResult(null);
+    isScanningRef.current = false; // Réinitialiser le verrou au démarrage
 
     if (navigator.mediaDevices) {
       if (videoRef.current) {
@@ -33,9 +37,17 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
             null, 
             videoRef.current, 
             (result, err) => {
-                if (result && !scannedResult) {
+                // Vérifier la ref au lieu du state pour une réaction immédiate
+                if (result && !isScanningRef.current) {
+                    isScanningRef.current = true; // Bloquer immédiatement
+                    
                     const text = result.getText();
                     setScannedResult(text);
+                    
+                    // Arrêter le flux vidéo tout de suite pour figer l'image et libérer les ressources
+                    codeReader.current.reset(); 
+                    
+                    // Appeler le callback parent
                     onScan(text);
                 }
                 if (err && !(err instanceof NotFoundException)) {
