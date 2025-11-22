@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, NotFoundException } from '@zxing/library';
+import { BrowserMultiFormatReader, NotFoundException, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { X, Camera, RefreshCw, AlertCircle } from 'lucide-react';
 
 interface BarcodeScannerProps {
@@ -12,13 +12,26 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   const [error, setError] = useState<string | null>(null);
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   
-  // On utilise le reader sans configuration complexe
-  const codeReader = useRef(new BrowserMultiFormatReader());
+  // Configuration avancée pour les codes difficiles (courbés, textiles)
+  const hints = new Map();
+  // TRY_HARDER est crucial pour les étiquettes textiles courbées
+  hints.set(DecodeHintType.TRY_HARDER, true);
+  
+  // On spécifie les formats pour éviter de chercher inutilement d'autres types
+  // Votre étiquette est un Code 128
+  hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+    BarcodeFormat.CODE_128,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.EAN_13,
+    BarcodeFormat.DATA_MATRIX,
+    BarcodeFormat.QR_CODE
+  ]);
+
+  const codeReader = useRef(new BrowserMultiFormatReader(hints));
 
   useEffect(() => {
     startScan();
     return () => {
-      // Nettoyage propre à la fermeture
       codeReader.current.reset();
     };
   }, []);
@@ -27,30 +40,35 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
     setError(null);
     setScannedResult(null);
 
-    // Vérification basique du support média
-    // Fix TS2774: Removed redundant check for getUserMedia
+    // Fix TS2774: Removed redundant navigator.mediaDevices.getUserMedia check
     if (navigator.mediaDevices) {
       if (videoRef.current) {
-        // On laisse la librairie choisir la meilleure caméra
-        // Fix TS2345: Passed 'null' instead of 'undefined'
-        codeReader.current.decodeFromVideoDevice(
-            null, 
+        // On demande explicitement de la HD (1920x1080)
+        // C'est indispensable pour lire les barres fines sur un code long comme le vôtre
+        const constraints = {
+            video: { 
+                facingMode: 'environment',
+                width: { min: 1280, ideal: 1920 },
+                height: { min: 720, ideal: 1080 }
+            }
+        };
+
+        codeReader.current.decodeFromConstraints(
+            constraints,
             videoRef.current, 
             (result, err) => {
                 if (result && !scannedResult) {
                     const text = result.getText();
                     setScannedResult(text);
-                    // Petit délai visuel ou retour haptique si besoin, puis on valide
                     onScan(text);
                 }
                 if (err && !(err instanceof NotFoundException)) {
-                    // On ne log pas les NotFoundException qui arrivent à chaque frame vide
-                    console.warn(err);
+                    // console.warn(err);
                 }
             }
         ).catch(err => {
             console.error(err);
-            setError("Impossible d'accéder à la caméra. Vérifiez les permissions.");
+            setError("Impossible d'accéder à la caméra haute résolution.");
         });
       }
     } else {
@@ -65,10 +83,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
-      {/* Header */}
       <div className="flex justify-between items-center p-4 text-white bg-black/50 backdrop-blur-sm absolute top-0 left-0 right-0 z-10">
         <h2 className="font-bold text-lg flex items-center gap-2">
-          <Camera className="w-5 h-5" /> Scanner
+          <Camera className="w-5 h-5" /> Scanner Pro
         </h2>
         <button 
           onClick={onClose}
@@ -78,29 +95,35 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
         </button>
       </div>
 
-      {/* Camera View */}
       <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden">
         <video 
           ref={videoRef} 
           className="w-full h-full object-cover"
         />
         
-        {/* Overlay Guide - Style visuel pour aider à cadrer */}
         {!scannedResult && !error && (
             <>
                 <div className="absolute inset-0 border-[40px] border-black/50 z-0 pointer-events-none"></div>
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                    <div className="w-72 h-48 border-2 border-white/50 rounded-lg relative">
+                    {/* Cadre plus large pour les codes longs */}
+                    <div className="w-80 h-40 border-2 border-white/50 rounded-lg relative">
                          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-fire-500 -mt-0.5 -ml-0.5"></div>
                          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-fire-500 -mt-0.5 -mr-0.5"></div>
                          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-fire-500 -mb-0.5 -ml-0.5"></div>
                          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-fire-500 -mb-0.5 -mr-0.5"></div>
+                         
+                         {/* Ligne de visée rouge pour aider à l'alignement */}
+                         <div className="absolute top-1/2 left-4 right-4 h-px bg-red-500/50"></div>
                     </div>
+                </div>
+                <div className="absolute bottom-20 left-0 right-0 text-center pointer-events-none">
+                    <p className="text-white text-sm bg-black/50 px-4 py-2 rounded-full inline-block">
+                        Aplatissez bien l'étiquette si possible
+                    </p>
                 </div>
             </>
         )}
         
-        {/* Feedback visuel lors du succès */}
         {scannedResult && (
              <div className="absolute inset-0 flex items-center justify-center bg-green-500/20 backdrop-blur-sm z-20">
                 <div className="bg-white p-6 rounded-2xl shadow-xl text-center animate-bounce">
