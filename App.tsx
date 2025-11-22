@@ -209,7 +209,9 @@ const App: React.FC = () => {
 
       if (checkError) {
         console.error("Erreur lors de la vérification du code-barres:", checkError);
-        throw new Error(`Erreur de vérification: ${checkError.message}`);
+        dismissToast(loadingToastId);
+        showError(`Erreur de vérification: ${checkError.message}`);
+        return;
       }
 
       if (existingData) {
@@ -248,7 +250,9 @@ const App: React.FC = () => {
 
       if (error) {
         console.error("Erreur lors de l'insertion:", error);
-        throw new Error(`Erreur d'insertion: ${error.message}`);
+        dismissToast(loadingToastId);
+        showError(`Erreur d'insertion: ${error.message}`);
+        return;
       }
 
       // Mettre à jour l'état local
@@ -257,14 +261,18 @@ const App: React.FC = () => {
       showSuccess(`Équipement ${eq.type} ajouté avec succès.`);
       
     } catch (error: any) {
-      dismissToast(loadingToastId);
+      // S'assurer que le toast est toujours fermé en cas d'erreur inattendue
+      try {
+        dismissToast(loadingToastId);
+      } catch (e) {
+        // Ignorer les erreurs de fermeture de toast
+      }
+      
       console.error("Erreur détaillée lors de l'ajout de l'équipement:", error);
       
       // Message d'erreur plus détaillé
       const errorMessage = error.message || 'Erreur inconnue lors de l\'ajout';
       showError(`Erreur lors de l'ajout: ${errorMessage}`);
-      
-      throw error;
     }
   };
 
