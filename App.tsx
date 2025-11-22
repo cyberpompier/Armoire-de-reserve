@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
@@ -10,15 +10,9 @@ import { Session } from '@supabase/supabase-js';
 
 // Mock Initial Data (utilisé uniquement si pas de données)
 const INITIAL_STATE: AppState = {
-  inventory: [
-    { id: '1', type: EquipmentType.HELMET, size: 'M', barcode: 'CAS-001', status: EquipmentStatus.AVAILABLE, condition: 'Bon' },
-    { id: '2', type: EquipmentType.JACKET, size: 'L', barcode: 'VES-042', status: EquipmentStatus.LOANED, assignedTo: 'u1', condition: 'Usé' },
-    { id: '3', type: EquipmentType.BOOTS, size: '43', barcode: 'BOT-101', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
-    { id: '4', type: EquipmentType.GLOVES, size: '9', barcode: 'GAN-007', status: EquipmentStatus.DAMAGED, condition: 'Critique' },
-    { id: '5', type: EquipmentType.HELMET, size: 'L', barcode: 'CAS-005', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
-  ],
+  inventory: [], // Start empty, data will be fetched from Supabase
   users: [],
-  transactions: []
+  transactions: [] // Start empty, data will be fetched from Supabase
 };
 
 const App: React.FC = () => {
@@ -26,59 +20,12 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
-  // Auth Session Management
-  useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session) {
-        await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory(); // Récupérer tous les utilisateurs pour les listes
-      }
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      if (session) {
-        await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory();
-      } else {
-        setCurrentUser(null);
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Récupère le profil de l'utilisateur connecté
-  const fetchUserProfile = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (data && !error) {
-        const userProfile: User = {
-          id: userId,
-          matricule: data.matricule || 'N/A',
-          name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
-          rank: data.grade || 'Sapeur',
-          role: data.role || 'pompier'
-        };
-        setCurrentUser(userProfile);
-      }
-    } catch (err) {
-      console.error("Error fetching profile:", err);
-    }
-  };
+  // --- Data Fetching Functions ---
 
   // Récupère TOUS les profils pour peupler les listes déroulantes
-  const fetchUsersDirectory = async () => {
+  const fetchUsersDirectory = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -103,61 +50,220 @@ const App: React.FC = () => {
     } catch (e) {
       console.error("Erreur chargement annuaire:", e);
     }
-  };
+  }, []);
 
-  // Load from local storage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('firestock_state');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // On garde les users chargés depuis la BDD s'ils sont vides dans le storage
-      setState(prev => ({ ...parsed, users: prev.users.length ? prev.users : parsed.users }));
+  // Récupère l'inventaire et les transactions
+  const fetchInventoryAndTransactions = useCallback(async () => {
+    setIsLoadingData(true);
+    try {
+      // Fetch Inventory
+      const { data: inventoryData, error: invError } = await supabase
+        .from('armoire_equipment')
+        .select('*');
+      
+      if (invError) throw invError;
+
+      // Fetch Transactions
+      const { data: transactionData, error: transError } = await supabase
+        .from('armoire_transactions')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (transError) throw transError;
+
+      setState(prev => ({
+        ...prev,
+        inventory: inventoryData as Equipment[],
+        transactions: transactionData as Transaction[]
+      }));
+
+    } catch (e) {
+      console.error("Erreur lors du chargement des données:", e);
+    } finally {
+      setIsLoadingData(false);
     }
   }, []);
 
-  // Save to local storage on change
+  // Récupère le profil de l'utilisateur connecté
+  const fetchUserProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (data && !error) {
+        const userProfile: User = {
+          id: userId,
+          matricule: data.matricule || 'N/A',
+          name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
+          rank: data.grade || 'Sapeur',
+          role: data.role || 'pompier'
+        };
+        setCurrentUser(userProfile);
+      }
+    } catch (err) {
+      console.error("Error fetching profile:", err);
+    }
+  }, []);
+
+  // --- Auth Session Management ---
   useEffect(() => {
-    localStorage.setItem('firestock_state', JSON.stringify(state));
-  }, [state]);
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      if (session) {
+        await fetchUserProfile(session.user.id);
+        await fetchUsersDirectory();
+        await fetchInventoryAndTransactions();
+      }
+    };
 
-  const handleTransaction = (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
-    setState(prev => ({
-      ...prev,
-      inventory: prev.inventory.map(item => 
-        item.id === newTrans.equipmentId 
-          ? { ...item, status: newStatus, assignedTo: assigneeId } 
-          : item
-      ),
-      transactions: [newTrans, ...prev.transactions]
-    }));
+    initAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setSession(session);
+      if (session) {
+        await fetchUserProfile(session.user.id);
+        await fetchUsersDirectory();
+        await fetchInventoryAndTransactions();
+      } else {
+        setCurrentUser(null);
+        setState(INITIAL_STATE); // Clear state on logout
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile, fetchUsersDirectory, fetchInventoryAndTransactions]);
+
+  // --- CRUD Operations (Supabase) ---
+
+  const handleTransaction = async (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
+    if (!currentUser) return;
+
+    try {
+      // 1. Update Equipment Status
+      const { error: updateError } = await supabase
+        .from('armoire_equipment')
+        .update({ 
+          status: newStatus, 
+          assignedTo: assigneeId || null,
+          lastInspection: new Date().toISOString() // Mark as inspected/handled
+        })
+        .eq('id', newTrans.equipmentId);
+
+      if (updateError) throw updateError;
+
+      // 2. Insert Transaction Record
+      const { error: transError } = await supabase
+        .from('armoire_transactions')
+        .insert({
+          id: newTrans.id,
+          equipmentId: newTrans.equipmentId,
+          userId: currentUser.id, // Use current user ID for transaction logging
+          type: newTrans.type,
+          timestamp: newTrans.timestamp,
+          note: newTrans.note,
+          reason: (newTrans as any).reason,
+        });
+
+      if (transError) throw transError;
+
+      // 3. Update local state (optimistic update or re-fetch)
+      // For simplicity and consistency, we re-fetch all data after a successful transaction
+      await fetchInventoryAndTransactions();
+
+    } catch (error) {
+      console.error("Erreur lors de la transaction:", error);
+      alert("Erreur lors de l'enregistrement de la transaction.");
+      throw error; // Re-throw to notify modal/component
+    }
   };
 
-  const handleAddEquipment = (eq: Equipment) => {
-    setState(prev => ({
-      ...prev,
-      inventory: [...prev.inventory, eq]
-    }));
-    setActiveTab('stock');
+  const handleAddEquipment = async (eq: Equipment) => {
+    try {
+      const { error } = await supabase
+        .from('armoire_equipment')
+        .insert({
+          id: eq.id,
+          type: eq.type,
+          size: eq.size,
+          barcode: eq.barcode,
+          status: eq.status,
+          condition: eq.condition,
+          imageUrl: eq.imageUrl,
+          lastInspection: new Date().toISOString()
+        });
+
+      if (error) throw error;
+      
+      // Update local state
+      await fetchInventoryAndTransactions();
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de l'équipement:", error);
+      alert("Erreur lors de l'ajout de l'équipement. Le code-barres est peut-être déjà utilisé.");
+      throw error;
+    }
   };
 
-  const handleUpdateEquipment = (updatedItem: Equipment) => {
-    setState(prev => ({
-      ...prev,
-      inventory: prev.inventory.map(item => 
-        item.id === updatedItem.id ? updatedItem : item
-      )
-    }));
+  const handleUpdateEquipment = async (updatedItem: Equipment) => {
+    try {
+      const { error } = await supabase
+        .from('armoire_equipment')
+        .update({
+          type: updatedItem.type,
+          size: updatedItem.size,
+          barcode: updatedItem.barcode,
+          status: updatedItem.status,
+          condition: updatedItem.condition,
+          assignedTo: updatedItem.assignedTo || null,
+          lastInspection: new Date().toISOString()
+        })
+        .eq('id', updatedItem.id);
+
+      if (error) throw error;
+
+      // Update local state
+      await fetchInventoryAndTransactions();
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de l'équipement:", error);
+      alert("Erreur lors de la mise à jour de l'équipement.");
+      throw error;
+    }
   };
 
-  const handleDeleteEquipment = (itemId: string) => {
-    setState(prev => ({
-      ...prev,
-      inventory: prev.inventory.filter(item => item.id !== itemId)
-    }));
+  const handleDeleteEquipment = async (itemId: string) => {
+    try {
+      const { error } = await supabase
+        .from('armoire_equipment')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      await fetchInventoryAndTransactions();
+    } catch (error) {
+      console.error("Erreur lors de la suppression de l'équipement:", error);
+      alert("Erreur lors de la suppression de l'équipement.");
+      throw error;
+    }
   };
 
   if (!session) {
     return <Login />;
+  }
+  
+  if (isLoadingData) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center text-slate-500">
+          <LayoutDashboard className="w-8 h-8 animate-pulse mb-2" />
+          <p className="text-sm font-medium">Chargement des données...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -187,7 +293,11 @@ const App: React.FC = () => {
                  </div>
                )}
                <button 
-                onClick={() => { localStorage.removeItem('firestock_state'); window.location.reload(); }}
+                onClick={() => { 
+                  // No longer needed as data is in Supabase, but keep for local cache reset if needed
+                  localStorage.removeItem('firestock_state'); 
+                  window.location.reload(); 
+                }}
                 className="mt-8 text-fire-600 text-sm underline"
                >
                  Réinitialiser cache local
