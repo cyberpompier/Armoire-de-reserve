@@ -3,7 +3,7 @@ import { Equipment, EquipmentStatus, EquipmentType } from '../types';
 import { ScanLine, X, Pencil, Trash2, AlertTriangle, Loader2, Link2 } from 'lucide-react';
 
 interface AddItemModalProps {
-  onClose: () => void;
+  onClose: (reason?: 'scan') => void;
   onAdd: (item: Equipment, pairBarcode?: string) => Promise<void>;
   onUpdate?: (item: Equipment, pairBarcode?: string) => Promise<void>;
   onDelete?: (itemId: string) => Promise<void>;
@@ -20,7 +20,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     initialItem?.condition || 'Neuf'
   );
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
-  const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || initialBarcode || '');
+  const [newItemBarcode, setNewItemBarcode] = useState(initialBarcode || initialItem?.barcode || '');
   const [pairBarcode, setPairBarcode] = useState('');
   
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -88,18 +88,18 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
   const handleScanButtonClick = () => {
     onScanRequest();
-    onClose();
+    onClose('scan');
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => onClose()}></div>
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 animate-fade-in overflow-hidden max-h-[90vh] overflow-y-auto">
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg text-slate-800">
             {isEditing ? 'Modifier l\'EPI' : 'Ajouter un EPI'}
           </h3>
-          <button onClick={onClose} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
+          <button onClick={() => onClose()} className="p-1 hover:bg-slate-100 rounded-full text-slate-400">
             <X className="w-5 h-5" />
           </button>
         </div>

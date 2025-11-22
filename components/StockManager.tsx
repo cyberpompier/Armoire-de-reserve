@@ -26,7 +26,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [isClosingForScan, setIsClosingForScan] = useState(false);
 
   const filteredItems = state.inventory.filter(item => {
     const matchesFilter = filter === 'ALL' || item.status === filter;
@@ -90,13 +89,12 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     setSelectedItems(null);
   };
 
-  const handleModalClose = () => {
+  const handleModalClose = (reason?: 'scan') => {
     setShowAddModal(false);
     setBarcodeForForm(null);
-    if (!isClosingForScan) {
+    if (reason !== 'scan') {
       setEditingItem(null);
     }
-    setIsClosingForScan(false);
   };
 
   return (
@@ -144,9 +142,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           initialItem={editingItem}
           initialBarcode={barcodeForForm}
           onScanRequest={() => {
-            if (editingItem) {
-              setIsClosingForScan(true);
-            }
             setScanTarget('form');
             setIsScanning(true);
           }}
