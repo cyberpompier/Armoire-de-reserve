@@ -31,14 +31,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     setIsSubmitting(true);
 
     try {
-      // Génération d'ID plus robuste pour éviter les collisions
-      const newItemId = initialItem?.id || (crypto.randomUUID ? crypto.randomUUID() : `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
+      // 1. Generate a unique ID for the item
+      const newItemId = initialItem?.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 2. Generate a unique barcode if none is provided, using part of the unique ID
+      const finalBarcode = newItemBarcode.trim() || `MAN-${newItemId.slice(-8).toUpperCase()}`;
 
       const itemData: Equipment = {
         id: newItemId,
         type: newItemType,
         size: newItemSize,
-        barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
+        barcode: finalBarcode,
         status: newItemStatus,
         condition: newItemCondition,
         imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
@@ -53,6 +56,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       onClose();
     } catch (error) {
       console.error("Erreur lors de la sauvegarde", error);
+      // Error handling is done in App.tsx (onAdd/onUpdate)
+    } finally {
+      // CRITICAL: Always reset submitting state
       setIsSubmitting(false);
     }
   };
