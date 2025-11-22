@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { AppState, Equipment, EquipmentType, EquipmentStatus, Transaction, User } from '../types';
-import { ScannerAI } from './ScannerAI';
+import { AppState, Equipment, EquipmentStatus, Transaction, User } from '../types';
 import { BarcodeScanner } from './BarcodeScanner';
 import { StockHeader } from './StockHeader';
 import { StockList } from './StockList';
@@ -27,6 +26,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isClosingForScan, setIsClosingForScan] = useState(false);
 
   const filteredItems = state.inventory.filter(item => {
     const matchesFilter = filter === 'ALL' || item.status === filter;
@@ -90,6 +90,15 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     setSelectedItems(null);
   };
 
+  const handleModalClose = () => {
+    setShowAddModal(false);
+    setBarcodeForForm(null);
+    if (!isClosingForScan) {
+      setEditingItem(null);
+    }
+    setIsClosingForScan(false);
+  };
+
   return (
     <div className="pb-6 animate-fade-in">
       {isScanning && (
@@ -116,7 +125,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
         items={filteredItems}
         users={state.users}
         onItemClick={(item) => {
-          // Same logic as scan to find pair
           let itemsToSelect = [item];
           if (item.pairId) {
             const pairedItem = state.inventory.find(i => i.id === item.pairId);
@@ -129,13 +137,16 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
 
       {showAddModal && (
         <AddItemModal 
-          onClose={() => { setShowAddModal(false); setEditingItem(null); setBarcodeForForm(null); }}
+          onClose={handleModalClose}
           onAdd={onAddEquipment}
           onUpdate={onUpdateEquipment}
           onDelete={onDeleteEquipment}
           initialItem={editingItem}
           initialBarcode={barcodeForForm}
           onScanRequest={() => {
+            if (editingItem) {
+              setIsClosingForScan(true);
+            }
             setScanTarget('form');
             setIsScanning(true);
           }}
