@@ -42,12 +42,13 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   const handleConfirm = async (action: 'LOAN' | 'RETURN') => {
     // Configuration de l'email commune
     const recipient = 'sebastien.dupressoir@sdis60.fr';
-    const userEmail = (currentUser as any)?.email;
-    let mailtoLink = '';
+    const userEmail = currentUser?.email;
+    let subject = '';
+    let body = '';
 
     if (action === 'LOAN') {
-      const subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
-      const body = `Bonjour, je viens d’emprunter le materiel suivant:\n\n` +
+      subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
+      body = `Bonjour, je viens d’emprunter le materiel suivant:\n\n` +
         `Détails de l'emprunt de matériel :\n\n` +
         `--- MATÉRIEL ---\n` +
         `Type : ${item.type}\n` +
@@ -62,13 +63,11 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Date : ${new Date().toLocaleString('fr-FR')}\n\n` +
         `Je m’engage à le restituer propre, et je signalerais toutes anomalies, via l’application.\n\n` +
         `Cordialement`;
-
-      mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     } 
     else if (action === 'RETURN') {
       const assignedUser = users.find(u => u.id === item.assignedTo);
-      const subject = `Retour EPI : ${item.type} - ${item.barcode}`;
-      const body = `Bonjour, je viens de restituer le materiel suivant:\n\n` +
+      subject = `Retour EPI : ${item.type} - ${item.barcode}`;
+      body = `Bonjour, je viens de restituer le materiel suivant:\n\n` +
         `Détails du retour de matériel :\n\n` +
         `--- MATÉRIEL ---\n` +
         `Type : ${item.type}\n` +
@@ -81,9 +80,17 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Enregistré par : ${currentUser?.name || 'Inconnu'}\n` +
         `Date : ${new Date().toLocaleString('fr-FR')}\n\n` +
         `Cordialement`;
-
-      mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
+
+    // Build mailto link robustly
+    const params = new URLSearchParams();
+    params.append('subject', subject);
+    params.append('body', body);
+    if (userEmail) {
+      params.append('cc', userEmail);
+    }
+    
+    const mailtoLink = `mailto:${recipient}?${params.toString().replace(/\+/g, '%20')}`;
 
     try {
       // Await the database action first

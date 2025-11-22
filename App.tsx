@@ -90,6 +90,8 @@ const App: React.FC = () => {
   // Récupère le profil de l'utilisateur connecté
   const fetchUserProfile = useCallback(async (userId: string) => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -99,6 +101,7 @@ const App: React.FC = () => {
       if (data && !error) {
         const userProfile: User = {
           id: userId,
+          email: session?.user.email,
           matricule: data.matricule || 'N/A',
           name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur',
