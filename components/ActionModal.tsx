@@ -57,10 +57,17 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
         
         <div className="flex justify-between items-start mb-6">
-          <div>
-            <h2 className="text-xl font-bold text-slate-900 mb-1">{primaryItem.type} {isPair && '(Paire)'}</h2>
-            <p className="text-slate-500 text-sm">ID: {primaryItem.barcode}</p>
-            {isPair && <p className="text-slate-500 text-sm flex items-center gap-1"><Link2 size={12}/> {items[1].barcode}</p>}
+          <div className="flex items-start gap-4">
+            <img 
+              src={primaryItem.imageUrl} 
+              alt={primaryItem.type} 
+              className="w-16 h-16 rounded-xl object-cover bg-slate-100"
+            />
+            <div>
+              <h2 className="text-xl font-bold text-slate-900 mb-1">{primaryItem.type} {isPair && '(Paire)'}</h2>
+              <p className="text-slate-500 text-sm">ID: {primaryItem.barcode}</p>
+              {isPair && <p className="text-slate-500 text-sm flex items-center gap-1"><Link2 size={12}/> {items[1].barcode}</p>}
+            </div>
           </div>
           {isAdmin && (
             <button 
