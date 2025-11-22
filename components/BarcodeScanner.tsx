@@ -12,7 +12,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
   const [error, setError] = useState<string | null>(null);
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   
-  // Utilisation du constructeur par défaut (sans hints) comme dans votre code exemple
+  // Moteur de scan : Configuration par défaut (éprouvée)
   const codeReader = useRef(new BrowserMultiFormatReader());
 
   useEffect(() => {
@@ -26,10 +26,9 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
     setError(null);
     setScannedResult(null);
 
-    // Vérification simplifiée pour éviter les erreurs TS sur getUserMedia
     if (navigator.mediaDevices) {
       if (videoRef.current) {
-        // Logique exacte de votre exemple : undefined en 1er paramètre
+        // null permet à la librairie de choisir la caméra par défaut (souvent la meilleure)
         codeReader.current.decodeFromVideoDevice(
             null, 
             videoRef.current, 
@@ -40,7 +39,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
                     onScan(text);
                 }
                 if (err && !(err instanceof NotFoundException)) {
-                   // On ignore les erreurs silencieuses de scan
+                   // Silence sur les erreurs de frame vide
                 }
             }
         ).catch(err => {
@@ -63,7 +62,7 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
       {/* Header */}
       <div className="flex justify-between items-center p-4 text-white bg-black/50 backdrop-blur-sm absolute top-0 left-0 right-0 z-10">
         <h2 className="font-bold text-lg flex items-center gap-2">
-          <Camera className="w-5 h-5" /> Scanner Standard
+          <Camera className="w-5 h-5" /> Scanner Code-Barres
         </h2>
         <button 
           onClick={onClose}
@@ -82,14 +81,16 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
         
         {!scannedResult && !error && (
             <>
-                <div className="absolute inset-0 border-[40px] border-black/50 z-0 pointer-events-none"></div>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-                    <div className="w-72 h-48 border-2 border-white/50 rounded-lg relative">
-                         <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-fire-500 -mt-0.5 -ml-0.5"></div>
-                         <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-fire-500 -mt-0.5 -mr-0.5"></div>
-                         <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-fire-500 -mb-0.5 -ml-0.5"></div>
-                         <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-fire-500 -mb-0.5 -mr-0.5"></div>
-                    </div>
+                {/* VISEUR POINTILLÉ : Style identique à votre capture d'écran */}
+                <div className="absolute inset-0 flex items-center justify-center p-8 pointer-events-none z-10">
+                    <div className="w-full max-w-sm aspect-[2/1] border-4 border-dashed border-white/80 rounded-xl shadow-sm"></div>
+                </div>
+                
+                {/* Texte d'aide discret en bas */}
+                <div className="absolute bottom-20 left-0 right-0 text-center pointer-events-none z-10">
+                    <p className="text-white/80 text-sm font-medium bg-black/30 px-4 py-2 rounded-full inline-block backdrop-blur-sm">
+                        Placez le code dans le cadre
+                    </p>
                 </div>
             </>
         )}
