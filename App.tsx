@@ -169,7 +169,7 @@ const App: React.FC = () => {
 
     // Écriture DB - Tables renommées
     try {
-      await supabase.from('armoire_transactions').insert({
+      const { error: transError } = await supabase.from('armoire_transactions').insert({
         id: newTrans.id,
         equipment_id: newTrans.equipmentId,
         user_id: newTrans.userId,
@@ -178,13 +178,17 @@ const App: React.FC = () => {
         reason: newTrans.reason,
         note: newTrans.note
       });
+      if (transError) throw transError;
 
-      await supabase.from('armoire_equipment').update({
+      const { error: updateError } = await supabase.from('armoire_equipment').update({
         status: newStatus,
         assigned_to: assigneeId || null
       }).eq('id', newTrans.equipmentId);
-    } catch (err) {
+      if (updateError) throw updateError;
+
+    } catch (err: any) {
       console.error("Erreur transaction DB:", err);
+      alert(`Erreur de sauvegarde : ${err.message || 'Inconnue'}`);
       fetchSharedData(); // Rollback en cas d'erreur
     }
   };
@@ -197,20 +201,29 @@ const App: React.FC = () => {
     }));
     setActiveTab('stock');
 
-    // DB - Table corrigée
+    // DB - Table corrigée et sécurisée
     try {
-      await supabase.from('armoire_equipment').insert({
+      const { error } = await supabase.from('armoire_equipment').insert({
         id: eq.id,
         type: eq.type,
         size: eq.size,
         barcode: eq.barcode,
         status: eq.status,
         condition: eq.condition,
-        assigned_to: eq.assignedTo,
-        image_url: eq.imageUrl
+        assigned_to: eq.assignedTo || null, // Convertir undefined en null
+        image_url: eq.imageUrl || null
       });
-    } catch (err) {
+
+      if (error) throw error;
+
+    } catch (err: any) {
       console.error("Erreur ajout DB:", err);
+      alert(`Impossible d'ajouter l'équipement : ${err.message || 'Erreur inconnue'}`);
+      // Optionnel : Retirer l'item de la liste si échec
+      setState(prev => ({
+        ...prev,
+        inventory: prev.inventory.filter(i => i.id !== eq.id)
+      }));
     }
   };
 
@@ -225,17 +238,21 @@ const App: React.FC = () => {
 
     // DB - Table corrigée
     try {
-      await supabase.from('armoire_equipment').update({
+      const { error } = await supabase.from('armoire_equipment').update({
         type: updatedItem.type,
         size: updatedItem.size,
         barcode: updatedItem.barcode,
         status: updatedItem.status,
         condition: updatedItem.condition,
-        assigned_to: updatedItem.assignedTo,
-        image_url: updatedItem.imageUrl
+        assigned_to: updatedItem.assignedTo || null,
+        image_url: updatedItem.imageUrl || null
       }).eq('id', updatedItem.id);
-    } catch (err) {
+
+      if (error) throw error;
+    } catch (err: any) {
       console.error("Erreur update DB:", err);
+      alert(`Erreur de mise à jour : ${err.message}`);
+      fetchSharedData(); // Rollback
     }
   };
 
@@ -248,9 +265,12 @@ const App: React.FC = () => {
 
     // DB - Table corrigée
     try {
-      await supabase.from('armoire_equipment').delete().eq('id', itemId);
-    } catch (err) {
+      const { error } = await supabase.from('armoire_equipment').delete().eq('id', itemId);
+      if (error) throw error;
+    } catch (err: any) {
       console.error("Erreur delete DB:", err);
+      alert(`Erreur de suppression : ${err.message}`);
+      fetchSharedData(); // Rollback
     }
   };
 
