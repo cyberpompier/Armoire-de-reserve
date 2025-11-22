@@ -149,13 +149,20 @@ const App: React.FC = () => {
 
     try {
       // 1. Update Equipment Status
+      // Ne pas inclure assignedTo si la colonne n'existe pas
+      const updateData: any = { 
+        status: newStatus,
+        lastInspection: new Date().toISOString()
+      };
+      
+      // Vérifier si la colonne assignedTo existe avant de l'inclure
+      if (assigneeId !== undefined) {
+        updateData.assignedTo = assigneeId || null;
+      }
+
       const { error: updateError } = await supabase
         .from('armoire_equipment')
-        .update({ 
-          status: newStatus, 
-          assignedTo: assigneeId || null,
-          lastInspection: new Date().toISOString() // Mark as inspected/handled
-        })
+        .update(updateData)
         .eq('id', newTrans.equipmentId);
 
       if (updateError) throw updateError;
@@ -212,7 +219,8 @@ const App: React.FC = () => {
       }
 
       // Préparer les données pour l'insertion
-      const equipmentData = {
+      // Ne pas inclure assignedTo si l'équipement est disponible
+      const equipmentData: any = {
         id: eq.id,
         type: eq.type,
         size: eq.size,
@@ -220,9 +228,13 @@ const App: React.FC = () => {
         status: eq.status,
         condition: eq.condition,
         imageUrl: eq.imageUrl || null,
-        lastInspection: new Date().toISOString(),
-        assignedTo: eq.assignedTo || null
+        lastInspection: new Date().toISOString()
       };
+
+      // N'inclure assignedTo que si l'équipement est prêté
+      if (eq.status === EquipmentStatus.LOANED && eq.assignedTo) {
+        equipmentData.assignedTo = eq.assignedTo;
+      }
 
       // Insérer le nouvel équipement
       const { data, error } = await supabase
@@ -255,17 +267,27 @@ const App: React.FC = () => {
   const handleUpdateEquipment = async (updatedItem: Equipment) => {
     const loadingToastId = showLoading("Mise à jour de l'équipement...");
     try {
+      // Préparer les données pour la mise à jour
+      // Ne pas inclure assignedTo si l'équipement est disponible
+      const updateData: any = {
+        type: updatedItem.type,
+        size: updatedItem.size,
+        barcode: updatedItem.barcode,
+        status: updatedItem.status,
+        condition: updatedItem.condition,
+        lastInspection: new Date().toISOString()
+      };
+
+      // N'inclure assignedTo que si l'équipement est prêté
+      if (updatedItem.status === EquipmentStatus.LOANED && updatedItem.assignedTo) {
+        updateData.assignedTo = updatedItem.assignedTo;
+      } else if (updatedItem.status === EquipmentStatus.AVAILABLE) {
+        updateData.assignedTo = null;
+      }
+
       const { error } = await supabase
         .from('armoire_equipment')
-        .update({
-          type: updatedItem.type,
-          size: updatedItem.size,
-          barcode: updatedItem.barcode,
-          status: updatedItem.status,
-          condition: updatedItem.condition,
-          assignedTo: updatedItem.assignedTo || null,
-          lastInspection: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', updatedItem.id);
 
       if (error) throw error;
