@@ -26,72 +26,44 @@ const App: React.FC = () => {
 
   // --- Data Fetching Functions ---
 
-  // Récupère TOUS les profils pour peupler les listes déroulantes
-  const fetchUsersDirectory = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('nom', { ascending: true });
-
-      if (data && !error) {
-        const directory: User[] = data.map((p: any) => ({
-          id: p.id,
-          matricule: p.matricule || 'N/A',
-          // Formatage : NOM Prénom
-          name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
-          rank: p.grade || '',
-          role: p.role || 'pompier'
-        }));
-
-        setState(prev => ({
-          ...prev,
-          users: directory
-        }));
-      }
-    } catch (e) {
-      console.error("Erreur chargement annuaire:", e);
-    }
-  }, []);
-
-  // Récupère l'inventaire et les transactions
-  const fetchInventoryAndTransactions = useCallback(async () => {
+  const fetchInitialData = useCallback(async () => {
     setIsLoadingData(true);
     try {
-      // Fetch Inventory
-      const { data: inventoryData, error: invError } = await supabase
-        .from('armoire_equipment')
-        .select('*');
-      
-      if (invError) throw invError;
+      const [usersRes, inventoryRes, transactionsRes] = await Promise.all([
+        supabase.from('profiles').select('*').order('nom', { ascending: true }),
+        supabase.from('armoire_equipment').select('*'),
+        supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
+      ]);
 
-      // Fetch Transactions
-      const { data: transactionData, error: transError } = await supabase
-        .from('armoire_transactions')
-        .select('*')
-        .order('timestamp', { ascending: false });
+      if (usersRes.error) throw usersRes.error;
+      if (inventoryRes.error) throw inventoryRes.error;
+      if (transactionsRes.error) throw transactionsRes.error;
 
-      if (transError) throw transError;
-
-      setState(prev => ({
-        ...prev,
-        inventory: inventoryData as Equipment[],
-        transactions: transactionData as Transaction[]
+      const directory: User[] = usersRes.data.map((p: any) => ({
+        id: p.id,
+        matricule: p.matricule || 'N/A',
+        name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
+        rank: p.grade || '',
+        role: p.role || 'pompier',
+        email: p.email
       }));
 
+      setState({
+        users: directory,
+        inventory: inventoryRes.data as Equipment[],
+        transactions: transactionsRes.data as Transaction[]
+      });
+
     } catch (e) {
-      console.error("Erreur lors du chargement des données:", e);
-      showError("Erreur lors du chargement des données");
+      console.error("Erreur lors du chargement des données initiales:", e);
+      showError("Erreur de chargement des données");
     } finally {
       setIsLoadingData(false);
     }
   }, []);
 
-  // Récupère le profil de l'utilisateur connecté
-  const fetchUserProfile = useCallback(async (userId: string) => {
+  const fetchUserProfile = useCallback(async (userId: string, email?: string) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -101,13 +73,16 @@ const App: React.FC = () => {
       if (data && !error) {
         const userProfile: User = {
           id: userId,
-          email: session?.user.email,
+          email: email,
           matricule: data.matricule || 'N/A',
           name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur',
           role: data.role || 'pompier'
         };
         setCurrentUser(userProfile);
+      } else {
+         // Create a fallback profile if none exists
+         setCurrentUser({ id: userId, email: email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
       }
     } catch (err) {
       console.error("Error fetching profile:", err);
@@ -116,240 +91,153 @@ const App: React.FC = () => {
 
   // --- Auth Session Management ---
   useEffect(() => {
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      if (session) {
-        await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory();
-        await fetchInventoryAndTransactions();
-      }
-    };
-
-    initAuth();
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       if (session) {
-        await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory();
-        await fetchInventoryAndTransactions();
+        await fetchUserProfile(session.user.id, session.user.email);
+        await fetchInitialData();
       } else {
         setCurrentUser(null);
         setState(INITIAL_STATE); // Clear state on logout
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [fetchUserProfile, fetchUsersDirectory, fetchInventoryAndTransactions]);
+    // Initial load
+    supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            setSession(session)
+            fetchUserProfile(session.user.id, session.user.email);
+            fetchInitialData();
+        }
+    });
 
-  // --- CRUD Operations (Supabase) ---
+    return () => subscription.unsubscribe();
+  }, [fetchUserProfile, fetchInitialData]);
+
+  // --- CRUD Operations (Efficient State Updates) ---
 
   const handleTransaction = async (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
-    if (!currentUser) return;
-    
-    const loadingToastId = showLoading(`Enregistrement de la ${newTrans.type === 'OUT' ? 'sortie' : 'retour'}...`);
-
+    const loadingToastId = showLoading(`Enregistrement...`);
     try {
-      // 1. Update Equipment Status
-      const updateData: any = { 
-        status: newStatus,
-        lastInspection: new Date().toISOString(),
-        assignedTo: newStatus === EquipmentStatus.LOANED ? assigneeId : null
-      };
-
-      const { error: updateError } = await supabase
+      // 1. Update Equipment in DB and get the updated record back
+      const { data: updatedEquipment, error: updateError } = await supabase
         .from('armoire_equipment')
-        .update(updateData)
-        .eq('id', newTrans.equipmentId);
+        .update({ 
+          status: newStatus, 
+          assignedTo: newStatus === EquipmentStatus.LOANED ? assigneeId : null,
+          lastInspection: new Date().toISOString()
+        })
+        .eq('id', newTrans.equipmentId)
+        .select()
+        .single();
 
-      if (updateError) {
-        // If the error is about a missing column, try again without it.
-        if (updateError.message.includes("column") && updateError.message.includes("does not exist")) {
-            console.warn("Tentative de mise à jour sans la colonne 'assignedTo'.");
-            delete updateData.assignedTo;
-            const { error: retryError } = await supabase
-                .from('armoire_equipment')
-                .update(updateData)
-                .eq('id', newTrans.equipmentId);
-            if (retryError) throw retryError;
-        } else {
-            throw updateError;
-        }
-      }
+      if (updateError) throw updateError;
 
-      // 2. Insert Transaction Record
-      const { error: transError } = await supabase
-        .from('armoire_transactions')
-        .insert({
-          id: newTrans.id,
-          equipmentId: newTrans.equipmentId,
-          userId: newTrans.userId, // Use userId from transaction object
-          type: newTrans.type,
-          timestamp: new Date(newTrans.timestamp).toISOString(), // Ensure proper format
-          note: newTrans.note,
-          reason: (newTrans as any).reason,
-        });
+      // 2. Insert Transaction record
+      const { error: transError } = await supabase.from('armoire_transactions').insert({
+        id: newTrans.id,
+        equipmentId: newTrans.equipmentId,
+        userId: newTrans.userId,
+        type: newTrans.type,
+        timestamp: new Date(newTrans.timestamp).toISOString(),
+        note: newTrans.note,
+        reason: (newTrans as any).reason,
+      });
 
       if (transError) throw transError;
 
-      // 3. Update local state (optimistic update or re-fetch)
-      await fetchInventoryAndTransactions();
+      // 3. Update local state efficiently
+      setState(prevState => ({
+        ...prevState,
+        inventory: prevState.inventory.map(item => 
+          item.id === newTrans.equipmentId ? updatedEquipment as Equipment : item
+        ),
+        transactions: [newTrans, ...prevState.transactions] // Add to top of the list
+      }));
       
       dismissToast(loadingToastId);
-      showSuccess(`Opération réussie : ${newTrans.type === 'OUT' ? 'Équipement sorti' : 'Équipement retourné'}.`);
-
+      showSuccess(`Opération réussie !`);
     } catch (error: any) {
       dismissToast(loadingToastId);
-      console.error("Erreur lors de la transaction:", error);
-      showError(`Erreur lors de l'enregistrement de la transaction: ${error.message || 'Inconnue'}`);
-      throw error; // Re-throw to notify modal/component
+      showError(`Erreur: ${error.message}`);
+      throw error;
     }
   };
 
   const handleAddEquipment = async (eq: Equipment) => {
     const loadingToastId = showLoading("Ajout de l'équipement...");
-    
     try {
-      // Vérifier d'abord si le code-barres existe déjà
-      const { data: existingData, error: checkError } = await supabase
+      const { data: existing, error: checkError } = await supabase
+        .from('armoire_equipment').select('id').eq('barcode', eq.barcode).maybeSingle();
+      if (checkError) throw checkError;
+      if (existing) throw new Error("Ce code-barres existe déjà.");
+
+      const { data: newEquipment, error: insertError } = await supabase
         .from('armoire_equipment')
-        .select('id')
-        .eq('barcode', eq.barcode)
-        .maybeSingle(); // Utilisation de maybeSingle pour éviter les erreurs
+        .insert(eq)
+        .select()
+        .single();
 
-      if (checkError) {
-        console.error("Erreur lors de la vérification du code-barres:", checkError);
-        dismissToast(loadingToastId);
-        showError(`Erreur de vérification: ${checkError.message}`);
-        return;
-      }
+      if (insertError) throw insertError;
 
-      if (existingData) {
-        dismissToast(loadingToastId);
-        showError("Erreur: Ce code-barres existe déjà dans la base de données.");
-        return;
-      }
+      setState(prevState => ({
+        ...prevState,
+        inventory: [...prevState.inventory, newEquipment as Equipment]
+      }));
 
-      // Préparer les données pour l'insertion
-      // Ne pas inclure les colonnes qui n'existent pas dans la base
-      const equipmentData: any = {
-        id: eq.id,
-        type: eq.type,
-        size: eq.size,
-        barcode: eq.barcode,
-        status: eq.status,
-        condition: eq.condition,
-        lastInspection: new Date().toISOString()
-      };
-
-      // N'inclure assignedTo que si l'équipement est prêté et que la colonne existe
-      if (eq.status === EquipmentStatus.LOANED && eq.assignedTo) {
-        equipmentData.assignedTo = eq.assignedTo;
-      }
-
-      // N'inclure imageUrl que si elle existe
-      if (eq.imageUrl) {
-        equipmentData.imageUrl = eq.imageUrl;
-      }
-
-      // Insérer le nouvel équipement
-      const { data, error } = await supabase
-        .from('armoire_equipment')
-        .insert(equipmentData)
-        .select(); // Ajout de select() pour obtenir les données insérées
-
-      if (error) {
-        console.error("Erreur lors de l'insertion:", error);
-        dismissToast(loadingToastId);
-        showError(`Erreur d'insertion: ${error.message}`);
-        return;
-      }
-
-      // Mettre à jour l'état local
-      await fetchInventoryAndTransactions();
       dismissToast(loadingToastId);
-      showSuccess(`Équipement ${eq.type} ajouté avec succès.`);
-      
+      showSuccess(`Équipement ajouté.`);
     } catch (error: any) {
-      // S'assurer que le toast est toujours fermé en cas d'erreur inattendue
-      try {
-        dismissToast(loadingToastId);
-      } catch (e) {
-        // Ignorer les erreurs de fermeture de toast
-      }
-      
-      console.error("Erreur détaillée lors de l'ajout de l'équipement:", error);
-      
-      // Message d'erreur plus détaillé
-      const errorMessage = error.message || 'Erreur inconnue lors de l\'ajout';
-      showError(`Erreur lors de l'ajout: ${errorMessage}`);
+      dismissToast(loadingToastId);
+      showError(`Erreur: ${error.message}`);
+      throw error;
     }
   };
 
   const handleUpdateEquipment = async (updatedItem: Equipment) => {
-    const loadingToastId = showLoading("Mise à jour de l'équipement...");
+    const loadingToastId = showLoading("Mise à jour...");
     try {
-      // Préparer les données pour la mise à jour
-      // Ne pas inclure les colonnes qui n'existent pas dans la base
-      const updateData: any = {
-        type: updatedItem.type,
-        size: updatedItem.size,
-        barcode: updatedItem.barcode,
-        status: updatedItem.status,
-        condition: updatedItem.condition,
-        lastInspection: new Date().toISOString()
-      };
-
-      // N'inclure assignedTo que si l'équipement est prêté
-      if (updatedItem.status === EquipmentStatus.LOANED && updatedItem.assignedTo) {
-        updateData.assignedTo = updatedItem.assignedTo;
-      } else if (updatedItem.status === EquipmentStatus.AVAILABLE) {
-        updateData.assignedTo = null;
-      }
-
-      // N'inclure imageUrl que si elle existe
-      if (updatedItem.imageUrl) {
-        updateData.imageUrl = updatedItem.imageUrl;
-      }
-
-      const { error } = await supabase
+      const { data: returnedItem, error } = await supabase
         .from('armoire_equipment')
-        .update(updateData)
-        .eq('id', updatedItem.id);
+        .update(updatedItem)
+        .eq('id', updatedItem.id)
+        .select()
+        .single();
 
       if (error) throw error;
 
-      // Update local state
-      await fetchInventoryAndTransactions();
+      setState(prevState => ({
+        ...prevState,
+        inventory: prevState.inventory.map(item => 
+          item.id === updatedItem.id ? returnedItem as Equipment : item
+        )
+      }));
+
       dismissToast(loadingToastId);
-      showSuccess(`Équipement ${updatedItem.type} mis à jour.`);
+      showSuccess(`Équipement mis à jour.`);
     } catch (error: any) {
       dismissToast(loadingToastId);
-      console.error("Erreur lors de la mise à jour de l'équipement:", error);
-      showError(`Erreur lors de la mise à jour: ${error.message || 'Inconnue'}`);
+      showError(`Erreur: ${error.message}`);
       throw error;
     }
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
-    const loadingToastId = showLoading("Suppression de l'équipement...");
+    const loadingToastId = showLoading("Suppression...");
     try {
-      const { error } = await supabase
-        .from('armoire_equipment')
-        .delete()
-        .eq('id', itemId);
-
+      const { error } = await supabase.from('armoire_equipment').delete().eq('id', itemId);
       if (error) throw error;
 
-      // Update local state
-      await fetchInventoryAndTransactions();
+      setState(prevState => ({
+        ...prevState,
+        inventory: prevState.inventory.filter(item => item.id !== itemId)
+      }));
+
       dismissToast(loadingToastId);
-      showSuccess("Équipement supprimé avec succès.");
+      showSuccess("Équipement supprimé.");
     } catch (error: any) {
       dismissToast(loadingToastId);
-      console.error("Erreur lors de la suppression de l'équipement:", error);
-      showError(`Erreur lors de la suppression: ${error.message || 'Inconnue'}`);
+      showError(`Erreur: ${error.message}`);
       throw error;
     }
   };
@@ -391,21 +279,6 @@ const App: React.FC = () => {
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
                <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
-               {currentUser?.role === 'admin' && (
-                 <div className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold">
-                    Panneau Administrateur Actif
-                 </div>
-               )}
-               <button 
-                onClick={() => { 
-                  // No longer needed as data is in Supabase, but keep for local cache reset if needed
-                  localStorage.removeItem('firestock_state'); 
-                  window.location.reload(); 
-                }}
-                className="mt-8 text-fire-600 text-sm underline"
-               >
-                 Réinitialiser cache local
-               </button>
              </div>
           )}
         </div>
