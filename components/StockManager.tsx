@@ -64,7 +64,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     playBeep();
     // Create new item from scan
     const newItem: Equipment = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       type,
       size: 'L', // Default
       barcode: `GEN-${Date.now().toString().slice(-6)}`,

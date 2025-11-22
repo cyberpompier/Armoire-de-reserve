@@ -31,7 +31,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     }
 
     const itemData: Equipment = {
-      id: initialItem?.id || Date.now().toString(),
+      id: initialItem?.id || crypto.randomUUID(),
       type: newItemType,
       size: newItemSize,
       barcode: newItemBarcode.trim(),
