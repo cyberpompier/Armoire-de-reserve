@@ -92,13 +92,22 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     }
   };
 
-  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
-    if (!selectedItem) return;
+  // Updated handleAction to accept specificItemId (for handling pairs)
+  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string, specificItemId?: string) => {
+    // Use specificItemId if provided (for the pair item), otherwise use selectedItem
+    const targetItemId = specificItemId || selectedItem?.id;
+    
+    // Find the item object (either selectedItem or finding the partner in inventory)
+    const targetItem = specificItemId 
+        ? state.inventory.find(i => i.id === specificItemId) 
+        : selectedItem;
+
+    if (!targetItem || !targetItemId) return;
 
     const transaction: any = {
-      id: Date.now().toString(),
-      equipmentId: selectedItem.id,
-      userId: action === 'LOAN' && userId ? userId : (selectedItem.assignedTo || 'SYSTEM'),
+      id: Date.now().toString() + (specificItemId ? '_pair' : ''), // Ensure unique ID if doing 2 at once
+      equipmentId: targetItemId,
+      userId: action === 'LOAN' && userId ? userId : (targetItem.assignedTo || 'SYSTEM'),
       type: action === 'LOAN' ? 'OUT' : 'IN',
       timestamp: Date.now(),
       note: note?.trim(),
@@ -107,8 +116,12 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
 
     const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
     onTransaction(transaction, newStatus, action === 'LOAN' ? userId : undefined);
-    setShowActionModal(false);
-    setSelectedItem(null);
+    
+    // Only close modal if we are processing the main item (or simply close at the end of the caller)
+    if (!specificItemId) {
+        setShowActionModal(false);
+        setSelectedItem(null);
+    }
   };
 
   return (
@@ -137,7 +150,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           setEditingItem(null); // Ensure we are in Add mode
           setShowAddModal(true);
         }}
-        userRole={currentUser?.role} // Ajout de la prop userRole ici
+        userRole={currentUser?.role} 
       />
 
       <StockList 
@@ -168,15 +181,16 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
           isOpen={showActionModal}
           onClose={() => setShowActionModal(false)}
           item={selectedItem}
+          inventory={state.inventory} // Passage de l'inventaire
           currentUser={currentUser}
           users={state.users}
           transactions={state.transactions}
           onAction={handleAction}
           onEdit={(item) => {
-            setShowActionModal(false); // Close view modal
+            setShowActionModal(false); 
             setSelectedItem(null);
-            setEditingItem(item); // Set item to edit
-            setShowAddModal(true); // Open edit modal (which is AddItemModal)
+            setEditingItem(item); 
+            setShowAddModal(true); 
           }}
         />
       )}
