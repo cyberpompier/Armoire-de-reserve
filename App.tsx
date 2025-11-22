@@ -191,6 +191,23 @@ const App: React.FC = () => {
   const handleAddEquipment = async (eq: Equipment) => {
     const loadingToastId = showLoading("Ajout de l'équipement...");
     try {
+      // Vérifier si le code-barres existe déjà
+      const { data: existingData, error: checkError } = await supabase
+        .from('armoire_equipment')
+        .select('id')
+        .eq('barcode', eq.barcode)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = pas de résultat
+        throw checkError;
+      }
+
+      if (existingData) {
+        dismissToast(loadingToastId);
+        showError("Erreur: Ce code-barres existe déjà dans la base de données.");
+        return;
+      }
+
       const { error } = await supabase
         .from('armoire_equipment')
         .insert({
@@ -213,7 +230,7 @@ const App: React.FC = () => {
     } catch (error: any) {
       dismissToast(loadingToastId);
       console.error("Erreur lors de l'ajout de l'équipement:", error);
-      showError(`Erreur: Le code-barres est peut-être déjà utilisé. (${error.message || 'Inconnue'})`);
+      showError(`Erreur lors de l'ajout: ${error.message || 'Inconnue'}`);
       throw error;
     }
   };

@@ -14,7 +14,6 @@ interface AddItemModalProps {
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest }) => {
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
-  // Typage explicite pour éviter les conflits
   const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>(
     initialItem?.condition || 'Neuf'
   );
@@ -25,11 +24,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
   const isEditing = !!initialItem;
 
   const handleSave = () => {
+    // Validation du code-barres
+    if (!newItemBarcode.trim()) {
+      alert("Veuillez saisir un code-barres ou un identifiant.");
+      return;
+    }
+
     const itemData: Equipment = {
       id: initialItem?.id || Date.now().toString(),
       type: newItemType,
       size: newItemSize,
-      barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
+      barcode: newItemBarcode.trim(),
       status: newItemStatus,
       condition: newItemCondition,
       imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
@@ -88,12 +93,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
           <div className="space-y-3">
             <div>
-               <label className="block text-xs font-medium text-slate-500 mb-1">Code Barre / Identifiant</label>
+               <label className="block text-xs font-medium text-slate-500 mb-1">Code Barre / Identifiant *</label>
                <input 
                  type="text"
                  value={newItemBarcode}
                  onChange={(e) => setNewItemBarcode(e.target.value)}
-                 placeholder="Ex: CAS-001 (Laisser vide pour auto)"
+                 placeholder="Ex: CAS-001"
                  className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono placeholder:font-sans"
                />
             </div>
@@ -144,8 +149,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                 <label className="block text-xs font-medium text-slate-500 mb-1">État (Usure)</label>
                 <select 
                   value={newItemCondition}
-                  // Ajout du cast 'as any' pour résoudre l'erreur TS2345
-                  onChange={(e) => setNewItemCondition(e.target.value as any)}
+                  onChange={(e) => setNewItemCondition(e.target.value as 'Neuf' | 'Bon' | 'Usé' | 'Critique')}
                   className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
                 >
                   {['Neuf', 'Bon', 'Usé', 'Critique'].map(c => (
