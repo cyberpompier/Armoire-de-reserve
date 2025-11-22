@@ -87,7 +87,10 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
   const handleScanButtonClick = () => {
     onScanRequest();
-    onClose();
+    // Add a small delay to allow the scan to initiate before the modal closes and unmounts
+    setTimeout(() => {
+      onClose();
+    }, 100);
   };
 
   return (
