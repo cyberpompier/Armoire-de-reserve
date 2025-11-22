@@ -19,7 +19,9 @@ interface StockManagerProps {
 export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onUpdateEquipment, onDeleteEquipment, onTransaction }) => {
   const [filter, setFilter] = useState<string>('ALL');
   const [search, setSearch] = useState('');
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanTarget, setScanTarget] = useState<'search' | 'form'>('search');
+  const [barcodeForForm, setBarcodeForForm] = useState<string | null>(null);
   
   const [selectedItems, setSelectedItems] = useState<Equipment[] | null>(null);
   const [editingItem, setEditingItem] = useState<Equipment | null>(null);
@@ -37,23 +39,28 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     return matchesFilter && matchesSearch;
   });
 
-  const handleBarcodeFound = (code: string) => {
-    setShowBarcodeScanner(false);
-    const scannedItem = state.inventory.find(item => item.barcode === code);
-    
-    if (scannedItem) {
-      let itemsToSelect = [scannedItem];
-      if (scannedItem.pairId) {
-        const pairedItem = state.inventory.find(item => item.id === scannedItem.pairId);
-        if (pairedItem) {
-          itemsToSelect.push(pairedItem);
-        }
-      }
-      setSelectedItems(itemsToSelect);
-      setShowActionModal(true);
+  const handleScan = (code: string) => {
+    setIsScanning(false);
+    if (scanTarget === 'form') {
+      setBarcodeForForm(code);
+      setShowAddModal(true);
     } else {
-      alert(`Équipement introuvable avec le code : ${code}`);
-      setSearch(code);
+      const scannedItem = state.inventory.find(item => item.barcode === code);
+      
+      if (scannedItem) {
+        let itemsToSelect = [scannedItem];
+        if (scannedItem.pairId) {
+          const pairedItem = state.inventory.find(item => item.id === scannedItem.pairId);
+          if (pairedItem) {
+            itemsToSelect.push(pairedItem);
+          }
+        }
+        setSelectedItems(itemsToSelect);
+        setShowActionModal(true);
+      } else {
+        alert(`Équipement introuvable avec le code : ${code}`);
+        setSearch(code);
+      }
     }
   };
 
@@ -85,10 +92,10 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
 
   return (
     <div className="pb-6 animate-fade-in">
-      {showBarcodeScanner && (
+      {isScanning && (
         <BarcodeScanner
-          onClose={() => setShowBarcodeScanner(false)}
-          onScan={handleBarcodeFound}
+          onClose={() => setIsScanning(false)}
+          onScan={handleScan}
         />
       )}
 
@@ -97,7 +104,10 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
         onSearchChange={setSearch}
         filter={filter}
         onFilterChange={setFilter}
-        onScanClick={() => setShowBarcodeScanner(true)}
+        onScanClick={() => {
+          setScanTarget('search');
+          setIsScanning(true);
+        }}
         onAddClick={() => { setEditingItem(null); setShowAddModal(true); }}
         userRole={currentUser?.role}
       />
@@ -119,12 +129,16 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
 
       {showAddModal && (
         <AddItemModal 
-          onClose={() => { setShowAddModal(false); setEditingItem(null); }}
+          onClose={() => { setShowAddModal(false); setEditingItem(null); setBarcodeForForm(null); }}
           onAdd={onAddEquipment}
           onUpdate={onUpdateEquipment}
           onDelete={onDeleteEquipment}
           initialItem={editingItem}
-          onScanRequest={() => { /* AI Scan logic can be added here */ }}
+          initialBarcode={barcodeForForm}
+          onScanRequest={() => {
+            setScanTarget('form');
+            setIsScanning(true);
+          }}
           inventory={state.inventory}
         />
       )}

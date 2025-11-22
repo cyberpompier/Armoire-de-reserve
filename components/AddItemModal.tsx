@@ -8,18 +8,19 @@ interface AddItemModalProps {
   onUpdate?: (item: Equipment, pairBarcode?: string) => Promise<void>;
   onDelete?: (itemId: string) => Promise<void>;
   initialItem?: Equipment | null;
+  initialBarcode?: string | null;
   onScanRequest: () => void;
   inventory: Equipment[]; // Pass full inventory to find pairs
 }
 
-export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest, inventory }) => {
+export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, initialBarcode, onScanRequest, inventory }) => {
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
   const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>(
     initialItem?.condition || 'Neuf'
   );
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
-  const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
+  const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || initialBarcode || '');
   const [pairBarcode, setPairBarcode] = useState('');
   
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -87,10 +88,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
   const handleScanButtonClick = () => {
     onScanRequest();
-    // Add a small delay to allow the scan to initiate before the modal closes and unmounts
-    setTimeout(() => {
-      onClose();
-    }, 100);
+    onClose();
   };
 
   return (
