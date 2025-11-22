@@ -6,14 +6,13 @@ import { StockHeader } from './StockHeader';
 import { StockList } from './StockList';
 import { AddItemModal } from './AddItemModal';
 import { ActionModal } from './ActionModal';
-import { showError } from '../utils/toast';
 
 interface StockManagerProps {
   state: AppState;
   currentUser: User | null;
-  onAddEquipment: (eq: Equipment) => Promise<void>;
-  onUpdateEquipment: (eq: Equipment) => Promise<void>;
-  onDeleteEquipment: (itemId: string) => Promise<void>;
+  onAddEquipment: (eq: Equipment) => void;
+  onUpdateEquipment: (eq: Equipment) => void;
+  onDeleteEquipment: (itemId: string) => void;
   onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
 }
 
@@ -73,7 +72,6 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
       condition: condition as 'Neuf'|'Bon'|'Usé'|'Critique',
       imageUrl: `https://picsum.photos/200?random=${Date.now()}`
     };
-    // This is a fire-and-forget call, which is okay for a quick add like this.
     onAddEquipment(newItem);
   };
 
@@ -88,7 +86,7 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
       setSelectedItem(foundItem);
       setShowActionModal(true);
     } else {
-      showError(`Équipement introuvable avec le code : ${code}`);
+      alert(`Équipement introuvable avec le code : ${code}`);
       setShowBarcodeScanner(false);
       setSearch(code);
     }

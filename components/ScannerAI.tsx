@@ -2,7 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Camera, X, Check, Loader2, Zap } from 'lucide-react';
 import { identifyEquipmentFromImage } from '../services/geminiService';
 import { EquipmentType } from '../types';
-import { showError } from '../utils/toast';
 
 interface ScannerAIProps {
   onClose: () => void;
@@ -63,7 +62,7 @@ export const ScannerAI: React.FC<ScannerAIProps> = ({ onClose, onIdentified }) =
         onIdentified(result.type, result.condition);
         onClose();
       } else {
-        showError("Impossible d'identifier l'objet. Réessayez avec un meilleur éclairage.");
+        alert("Impossible d'identifier l'objet. Réessayez avec un meilleur éclairage.");
       }
     }
     setAnalyzing(false);

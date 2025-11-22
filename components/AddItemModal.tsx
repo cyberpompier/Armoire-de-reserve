@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Equipment, EquipmentStatus, EquipmentType } from '../types';
-import { ScanLine, X, Pencil, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
+import { ScanLine, X, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 
 interface AddItemModalProps {
   onClose: () => void;
-  onAdd: (item: Equipment) => Promise<void>;
-  onUpdate?: (item: Equipment) => Promise<void>;
-  onDelete?: (itemId: string) => Promise<void>;
+  onAdd: (item: Equipment) => void;
+  onUpdate?: (item: Equipment) => void;
+  onDelete?: (itemId: string) => void;
   initialItem?: Equipment | null;
   onScanRequest: () => void;
 }
@@ -14,20 +14,19 @@ interface AddItemModalProps {
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest }) => {
   const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
   const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
+  // Typage explicite pour éviter les conflits
   const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>(
     initialItem?.condition || 'Neuf'
   );
   const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
   const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
 
   const isEditing = !!initialItem;
 
-  const handleSave = async () => {
-    setIsSaving(true);
+  const handleSave = () => {
     const itemData: Equipment = {
-      id: initialItem?.id || crypto.randomUUID(),
+      id: initialItem?.id || Date.now().toString(),
       type: newItemType,
       size: newItemSize,
       barcode: newItemBarcode.trim() || `MAN-${Date.now().toString().slice(-6)}`,
@@ -37,33 +36,18 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
     };
 
-    try {
-      if (isEditing && onUpdate) {
-        await onUpdate(itemData);
-      } else {
-        await onAdd(itemData);
-      }
-      onClose(); // Se ferme uniquement en cas de succès
-    } catch (error) {
-      // L'erreur est déjà affichée par un toast depuis App.tsx.
-      // Le modal reste ouvert pour permettre la correction.
-      console.error("La sauvegarde a échoué, le modal reste ouvert.", error);
-    } finally {
-      setIsSaving(false);
+    if (isEditing && onUpdate) {
+      onUpdate(itemData);
+    } else {
+      onAdd(itemData);
     }
+    onClose();
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (initialItem && onDelete) {
-      setIsSaving(true);
-      try {
-        await onDelete(initialItem.id);
-        onClose();
-      } catch (error) {
-        console.error("La suppression a échoué.", error);
-      } finally {
-        setIsSaving(false);
-      }
+      onDelete(initialItem.id);
+      onClose();
     }
   };
 
@@ -160,7 +144,8 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                 <label className="block text-xs font-medium text-slate-500 mb-1">État (Usure)</label>
                 <select 
                   value={newItemCondition}
-                  onChange={(e) => setNewItemCondition(e.target.value as 'Neuf' | 'Bon' | 'Usé' | 'Critique')}
+                  // Ajout du cast 'as any' pour résoudre l'erreur TS2345
+                  onChange={(e) => setNewItemCondition(e.target.value as any)}
                   className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
                 >
                   {['Neuf', 'Bon', 'Usé', 'Critique'].map(c => (
@@ -173,13 +158,13 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
 
           <button 
             onClick={handleSave}
-            disabled={isSaving}
-            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2 flex items-center justify-center gap-2 disabled:opacity-70"
+            className="w-full bg-slate-900 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform mt-2 flex items-center justify-center gap-2"
           >
-            {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : (isEditing ? <Pencil className="w-4 h-4" /> : null)}
-            {isSaving ? 'Enregistrement...' : (isEditing ? 'Mettre à jour' : 'Créer l\'équipement')}
+            {isEditing && <Pencil className="w-4 h-4" />}
+            {isEditing ? 'Mettre à jour' : 'Créer l\'équipement'}
           </button>
 
+          {/* Delete Button */}
           {isEditing && onDelete && (
             <div className="pt-4 mt-2 border-t border-slate-100">
               {!confirmDelete ? (
@@ -205,10 +190,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                      </button>
                      <button 
                        onClick={handleDelete}
-                       disabled={isSaving}
-                       className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-sm disabled:opacity-70"
+                       className="flex-1 py-2 bg-red-600 text-white text-xs font-bold rounded-lg shadow-sm"
                      >
-                       {isSaving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Confirmer'}
+                       Confirmer
                      </button>
                    </div>
                 </div>
