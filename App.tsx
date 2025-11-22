@@ -4,19 +4,12 @@ import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Settings, UserCircle, RefreshCw } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 
-// Mock Initial Data (utilisé uniquement si pas de données)
 const INITIAL_STATE: AppState = {
-  inventory: [
-    { id: '1', type: EquipmentType.HELMET, size: 'M', barcode: 'CAS-001', status: EquipmentStatus.AVAILABLE, condition: 'Bon' },
-    { id: '2', type: EquipmentType.JACKET, size: 'L', barcode: 'VES-042', status: EquipmentStatus.LOANED, assignedTo: 'u1', condition: 'Usé' },
-    { id: '3', type: EquipmentType.BOOTS, size: '43', barcode: 'BOT-101', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
-    { id: '4', type: EquipmentType.GLOVES, size: '9', barcode: 'GAN-007', status: EquipmentStatus.DAMAGED, condition: 'Critique' },
-    { id: '5', type: EquipmentType.HELMET, size: 'L', barcode: 'CAS-005', status: EquipmentStatus.AVAILABLE, condition: 'Neuf' },
-  ],
+  inventory: [],
   users: [],
   transactions: []
 };
@@ -26,6 +19,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'settings' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
+  const [loadingData, setLoadingData] = useState(false);
 
   // Auth Session Management
   useEffect(() => {
@@ -34,7 +28,8 @@ const App: React.FC = () => {
       setSession(session);
       if (session) {
         await fetchUserProfile(session.user.id);
-        await fetchUsersDirectory(); // Récupérer tous les utilisateurs pour les listes
+        await fetchUsersDirectory();
+        await fetchSharedData(); // Chargement des données partagées
       }
     };
 
@@ -45,15 +40,69 @@ const App: React.FC = () => {
       if (session) {
         await fetchUserProfile(session.user.id);
         await fetchUsersDirectory();
+        await fetchSharedData();
       } else {
         setCurrentUser(null);
+        setState(INITIAL_STATE);
       }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  // Récupère le profil de l'utilisateur connecté
+  // Récupération des données partagées (Inventaire + Transactions)
+  const fetchSharedData = async () => {
+    setLoadingData(true);
+    try {
+      // 1. Inventaire
+      const { data: equipmentData, error: eqError } = await supabase
+        .from('equipment')
+        .select('*');
+      
+      if (eqError) throw eqError;
+
+      const inventory: Equipment[] = (equipmentData || []).map(e => ({
+        id: e.id,
+        type: e.type as EquipmentType,
+        size: e.size,
+        barcode: e.barcode,
+        status: e.status as EquipmentStatus,
+        condition: e.condition as any,
+        assignedTo: e.assigned_to,
+        imageUrl: e.image_url
+      }));
+
+      // 2. Transactions
+      const { data: transData, error: trError } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('timestamp', { ascending: false });
+
+      if (trError) throw trError;
+
+      const transactions: Transaction[] = (transData || []).map(t => ({
+        id: t.id,
+        equipmentId: t.equipment_id,
+        userId: t.user_id,
+        type: t.type as 'OUT' | 'IN',
+        timestamp: t.timestamp,
+        reason: t.reason,
+        note: t.note
+      }));
+
+      setState(prev => ({
+        ...prev,
+        inventory,
+        transactions
+      }));
+
+    } catch (err) {
+      console.error("Erreur chargement données partagées:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   const fetchUserProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -68,7 +117,8 @@ const App: React.FC = () => {
           matricule: data.matricule || 'N/A',
           name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur',
-          role: data.role || 'pompier'
+          role: data.role || 'pompier',
+          email: session?.user.email
         };
         setCurrentUser(userProfile);
       }
@@ -77,7 +127,6 @@ const App: React.FC = () => {
     }
   };
 
-  // Récupère TOUS les profils pour peupler les listes déroulantes
   const fetchUsersDirectory = async () => {
     try {
       const { data, error } = await supabase
@@ -89,7 +138,6 @@ const App: React.FC = () => {
         const directory: User[] = data.map((p: any) => ({
           id: p.id,
           matricule: p.matricule || 'N/A',
-          // Formatage : NOM Prénom
           name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur Inconnu',
           rank: p.grade || '',
           role: p.role || 'pompier'
@@ -105,22 +153,10 @@ const App: React.FC = () => {
     }
   };
 
-  // Load from local storage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem('firestock_state');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      // On garde les users chargés depuis la BDD s'ils sont vides dans le storage
-      setState(prev => ({ ...parsed, users: prev.users.length ? prev.users : parsed.users }));
-    }
-  }, []);
+  // ACTIONS SUPABASE (Remplacement du LocalStorage)
 
-  // Save to local storage on change
-  useEffect(() => {
-    localStorage.setItem('firestock_state', JSON.stringify(state));
-  }, [state]);
-
-  const handleTransaction = (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
+  const handleTransaction = async (newTrans: Transaction, newStatus: EquipmentStatus, assigneeId?: string) => {
+    // Mise à jour Optimiste UI
     setState(prev => ({
       ...prev,
       inventory: prev.inventory.map(item => 
@@ -130,30 +166,92 @@ const App: React.FC = () => {
       ),
       transactions: [newTrans, ...prev.transactions]
     }));
+
+    // Écriture DB
+    try {
+      await supabase.from('transactions').insert({
+        id: newTrans.id,
+        equipment_id: newTrans.equipmentId,
+        user_id: newTrans.userId,
+        type: newTrans.type,
+        timestamp: newTrans.timestamp,
+        reason: newTrans.reason,
+        note: newTrans.note
+      });
+
+      await supabase.from('equipment').update({
+        status: newStatus,
+        assigned_to: assigneeId || null
+      }).eq('id', newTrans.equipmentId);
+    } catch (err) {
+      console.error("Erreur transaction DB:", err);
+      fetchSharedData(); // Rollback en cas d'erreur
+    }
   };
 
-  const handleAddEquipment = (eq: Equipment) => {
+  const handleAddEquipment = async (eq: Equipment) => {
+    // UI Optimiste
     setState(prev => ({
       ...prev,
       inventory: [...prev.inventory, eq]
     }));
     setActiveTab('stock');
+
+    // DB
+    try {
+      await supabase.from('equipment').insert({
+        id: eq.id,
+        type: eq.type,
+        size: eq.size,
+        barcode: eq.barcode,
+        status: eq.status,
+        condition: eq.condition,
+        assigned_to: eq.assignedTo,
+        image_url: eq.imageUrl
+      });
+    } catch (err) {
+      console.error("Erreur ajout DB:", err);
+    }
   };
 
-  const handleUpdateEquipment = (updatedItem: Equipment) => {
+  const handleUpdateEquipment = async (updatedItem: Equipment) => {
+    // UI Optimiste
     setState(prev => ({
       ...prev,
       inventory: prev.inventory.map(item => 
         item.id === updatedItem.id ? updatedItem : item
       )
     }));
+
+    // DB
+    try {
+      await supabase.from('equipment').update({
+        type: updatedItem.type,
+        size: updatedItem.size,
+        barcode: updatedItem.barcode,
+        status: updatedItem.status,
+        condition: updatedItem.condition,
+        assigned_to: updatedItem.assignedTo,
+        image_url: updatedItem.imageUrl
+      }).eq('id', updatedItem.id);
+    } catch (err) {
+      console.error("Erreur update DB:", err);
+    }
   };
 
-  const handleDeleteEquipment = (itemId: string) => {
+  const handleDeleteEquipment = async (itemId: string) => {
+    // UI Optimiste
     setState(prev => ({
       ...prev,
       inventory: prev.inventory.filter(item => item.id !== itemId)
     }));
+
+    // DB
+    try {
+      await supabase.from('equipment').delete().eq('id', itemId);
+    } catch (err) {
+      console.error("Erreur delete DB:", err);
+    }
   };
 
   if (!session) {
@@ -164,6 +262,12 @@ const App: React.FC = () => {
     <div className="h-full w-full bg-slate-50 font-sans text-slate-900 selection:bg-fire-200 flex justify-center">
       <main className="w-full max-w-md h-full bg-white shadow-2xl overflow-hidden flex flex-col relative">
         <div className="flex-1 overflow-y-auto overflow-x-hidden no-scrollbar relative w-full bg-slate-50/50">
+          {loadingData && (
+            <div className="absolute top-0 left-0 w-full h-1 bg-slate-100 overflow-hidden z-50">
+               <div className="h-full bg-fire-500 animate-pulse w-1/3 mx-auto"></div>
+            </div>
+          )}
+          
           {activeTab === 'dashboard' && <Dashboard state={state} />}
           {activeTab === 'stock' && (
             <StockManager 
@@ -180,18 +284,25 @@ const App: React.FC = () => {
              <div className="p-6 flex flex-col items-center justify-center min-h-full text-slate-400">
                <Settings className="w-16 h-16 mb-4 opacity-20" />
                <h2 className="text-lg font-medium">Paramètres</h2>
-               <p className="text-sm text-center mt-2">Configuration de la caserne.</p>
+               <p className="text-sm text-center mt-2">Données synchronisées via Supabase.</p>
+               
+               <button 
+                 onClick={fetchSharedData}
+                 className="mt-6 px-4 py-2 bg-white border border-slate-200 rounded-lg shadow-sm text-sm text-slate-600 flex items-center gap-2 active:scale-95 transition-transform"
+               >
+                 <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} />
+                 Forcer la synchronisation
+               </button>
+
                {currentUser?.role === 'admin' && (
-                 <div className="mt-4 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold">
+                 <div className="mt-6 px-4 py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold">
                     Panneau Administrateur Actif
                  </div>
                )}
-               <button 
-                onClick={() => { localStorage.removeItem('firestock_state'); window.location.reload(); }}
-                className="mt-8 text-fire-600 text-sm underline"
-               >
-                 Réinitialiser cache local
-               </button>
+               
+               <div className="mt-8 text-[10px] text-slate-300 text-center">
+                 Version PWA 1.1 • Connecté au Cloud
+               </div>
              </div>
           )}
         </div>
