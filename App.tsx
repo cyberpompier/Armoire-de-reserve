@@ -219,7 +219,7 @@ const App: React.FC = () => {
       }
 
       // Préparer les données pour l'insertion
-      // Ne pas inclure assignedTo si l'équipement est disponible
+      // Ne pas inclure les colonnes qui n'existent pas dans la base
       const equipmentData: any = {
         id: eq.id,
         type: eq.type,
@@ -227,13 +227,17 @@ const App: React.FC = () => {
         barcode: eq.barcode,
         status: eq.status,
         condition: eq.condition,
-        imageUrl: eq.imageUrl || null,
         lastInspection: new Date().toISOString()
       };
 
-      // N'inclure assignedTo que si l'équipement est prêté
+      // N'inclure assignedTo que si l'équipement est prêté et que la colonne existe
       if (eq.status === EquipmentStatus.LOANED && eq.assignedTo) {
         equipmentData.assignedTo = eq.assignedTo;
+      }
+
+      // N'inclure imageUrl que si elle existe
+      if (eq.imageUrl) {
+        equipmentData.imageUrl = eq.imageUrl;
       }
 
       // Insérer le nouvel équipement
@@ -268,7 +272,7 @@ const App: React.FC = () => {
     const loadingToastId = showLoading("Mise à jour de l'équipement...");
     try {
       // Préparer les données pour la mise à jour
-      // Ne pas inclure assignedTo si l'équipement est disponible
+      // Ne pas inclure les colonnes qui n'existent pas dans la base
       const updateData: any = {
         type: updatedItem.type,
         size: updatedItem.size,
@@ -283,6 +287,11 @@ const App: React.FC = () => {
         updateData.assignedTo = updatedItem.assignedTo;
       } else if (updatedItem.status === EquipmentStatus.AVAILABLE) {
         updateData.assignedTo = null;
+      }
+
+      // N'inclure imageUrl que si elle existe
+      if (updatedItem.imageUrl) {
+        updateData.imageUrl = updatedItem.imageUrl;
       }
 
       const { error } = await supabase
