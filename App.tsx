@@ -81,6 +81,7 @@ const App: React.FC = () => {
 
     } catch (e) {
       console.error("Erreur lors du chargement des données:", e);
+      showError("Erreur lors du chargement des données");
     } finally {
       setIsLoadingData(false);
     }
@@ -190,16 +191,18 @@ const App: React.FC = () => {
 
   const handleAddEquipment = async (eq: Equipment) => {
     const loadingToastId = showLoading("Ajout de l'équipement...");
+    
     try {
-      // Vérifier si le code-barres existe déjà
+      // Vérifier d'abord si le code-barres existe déjà
       const { data: existingData, error: checkError } = await supabase
         .from('armoire_equipment')
         .select('id')
         .eq('barcode', eq.barcode)
-        .single();
+        .maybeSingle(); // Utilisation de maybeSingle pour éviter les erreurs
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = pas de résultat
-        throw checkError;
+      if (checkError) {
+        console.error("Erreur lors de la vérification du code-barres:", checkError);
+        throw new Error(`Erreur de vérification: ${checkError.message}`);
       }
 
       if (existingData) {
@@ -208,29 +211,43 @@ const App: React.FC = () => {
         return;
       }
 
-      const { error } = await supabase
-        .from('armoire_equipment')
-        .insert({
-          id: eq.id,
-          type: eq.type,
-          size: eq.size,
-          barcode: eq.barcode,
-          status: eq.status,
-          condition: eq.condition,
-          imageUrl: eq.imageUrl,
-          lastInspection: new Date().toISOString()
-        });
+      // Préparer les données pour l'insertion
+      const equipmentData = {
+        id: eq.id,
+        type: eq.type,
+        size: eq.size,
+        barcode: eq.barcode,
+        status: eq.status,
+        condition: eq.condition,
+        imageUrl: eq.imageUrl || null,
+        lastInspection: new Date().toISOString(),
+        assignedTo: eq.assignedTo || null
+      };
 
-      if (error) throw error;
-      
-      // Update local state
+      // Insérer le nouvel équipement
+      const { data, error } = await supabase
+        .from('armoire_equipment')
+        .insert(equipmentData)
+        .select(); // Ajout de select() pour obtenir les données insérées
+
+      if (error) {
+        console.error("Erreur lors de l'insertion:", error);
+        throw new Error(`Erreur d'insertion: ${error.message}`);
+      }
+
+      // Mettre à jour l'état local
       await fetchInventoryAndTransactions();
       dismissToast(loadingToastId);
       showSuccess(`Équipement ${eq.type} ajouté avec succès.`);
+      
     } catch (error: any) {
       dismissToast(loadingToastId);
-      console.error("Erreur lors de l'ajout de l'équipement:", error);
-      showError(`Erreur lors de l'ajout: ${error.message || 'Inconnue'}`);
+      console.error("Erreur détaillée lors de l'ajout de l'équipement:", error);
+      
+      // Message d'erreur plus détaillé
+      const errorMessage = error.message || 'Erreur inconnue lors de l\'ajout';
+      showError(`Erreur lors de l'ajout: ${errorMessage}`);
+      
       throw error;
     }
   };
