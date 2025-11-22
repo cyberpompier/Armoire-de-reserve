@@ -13,18 +13,22 @@ export const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onClose 
 
   // Amélioration : Ajout de "hints" pour guider le lecteur de codes-barres
   const hints = new Map();
+  // Liste étendue et priorisée de formats pour une meilleure reconnaissance
   const formats = [
+    BarcodeFormat.CODE_128, // Très commun pour les étiquettes internes
     BarcodeFormat.QR_CODE,
-    BarcodeFormat.CODE_128,
     BarcodeFormat.EAN_13,
+    BarcodeFormat.CODE_39,
+    BarcodeFormat.DATA_MATRIX,
+    BarcodeFormat.ITF,
+    BarcodeFormat.CODABAR, // Ajout pour plus de compatibilité
     BarcodeFormat.EAN_8,
     BarcodeFormat.UPC_A,
     BarcodeFormat.UPC_E,
-    BarcodeFormat.DATA_MATRIX,
-    BarcodeFormat.ITF,
-    BarcodeFormat.CODE_39,
     BarcodeFormat.CODE_93,
     BarcodeFormat.PDF_417,
+    BarcodeFormat.RSS_14, // Ajout pour plus de compatibilité
+    BarcodeFormat.RSS_EXPANDED, // Ajout pour plus de compatibilité
   ];
   hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
   hints.set(DecodeHintType.TRY_HARDER, true); // Demande au lecteur de faire plus d'efforts
