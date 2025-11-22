@@ -13,7 +13,7 @@ interface StockManagerProps {
   onAddEquipment: (eq: Equipment) => void;
   onUpdateEquipment: (eq: Equipment) => void;
   onDeleteEquipment: (itemId: string) => void;
-  onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => void;
+  onTransaction: (trans: Transaction, newStatus: EquipmentStatus, assignee?: string) => Promise<void>;
 }
 
 export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, onAddEquipment, onUpdateEquipment, onDeleteEquipment, onTransaction }) => {
@@ -92,13 +92,17 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     }
   };
 
-  const handleAction = (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
-    if (!selectedItem) return;
+  const handleAction = async (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => {
+    if (!selectedItem || !currentUser) return;
 
-    const transaction: any = {
+    const transactionUserId = action === 'LOAN' 
+      ? userId || currentUser.id 
+      : selectedItem.assignedTo || currentUser.id;
+
+    const transaction: Transaction = {
       id: Date.now().toString(),
       equipmentId: selectedItem.id,
-      userId: action === 'LOAN' && userId ? userId : (selectedItem.assignedTo || 'SYSTEM'),
+      userId: transactionUserId,
       type: action === 'LOAN' ? 'OUT' : 'IN',
       timestamp: Date.now(),
       note: note?.trim(),
@@ -106,7 +110,10 @@ export const StockManager: React.FC<StockManagerProps> = ({ state, currentUser, 
     };
 
     const newStatus = action === 'LOAN' ? EquipmentStatus.LOANED : EquipmentStatus.AVAILABLE;
-    onTransaction(transaction, newStatus, action === 'LOAN' ? userId : undefined);
+    
+    // This will now throw an error if the transaction fails, which will be caught in ActionModal
+    await onTransaction(transaction, newStatus, action === 'LOAN' ? userId : undefined);
+    
     setShowActionModal(false);
     setSelectedItem(null);
   };

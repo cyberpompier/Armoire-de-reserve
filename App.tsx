@@ -149,23 +149,31 @@ const App: React.FC = () => {
 
     try {
       // 1. Update Equipment Status
-      // Ne pas inclure assignedTo si la colonne n'existe pas
       const updateData: any = { 
         status: newStatus,
-        lastInspection: new Date().toISOString()
+        lastInspection: new Date().toISOString(),
+        assignedTo: newStatus === EquipmentStatus.LOANED ? assigneeId : null
       };
-      
-      // Vérifier si la colonne assignedTo existe avant de l'inclure
-      if (assigneeId !== undefined) {
-        updateData.assignedTo = assigneeId || null;
-      }
 
       const { error: updateError } = await supabase
         .from('armoire_equipment')
         .update(updateData)
         .eq('id', newTrans.equipmentId);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        // If the error is about a missing column, try again without it.
+        if (updateError.message.includes("column") && updateError.message.includes("does not exist")) {
+            console.warn("Tentative de mise à jour sans la colonne 'assignedTo'.");
+            delete updateData.assignedTo;
+            const { error: retryError } = await supabase
+                .from('armoire_equipment')
+                .update(updateData)
+                .eq('id', newTrans.equipmentId);
+            if (retryError) throw retryError;
+        } else {
+            throw updateError;
+        }
+      }
 
       // 2. Insert Transaction Record
       const { error: transError } = await supabase
@@ -173,7 +181,7 @@ const App: React.FC = () => {
         .insert({
           id: newTrans.id,
           equipmentId: newTrans.equipmentId,
-          userId: currentUser.id, // Use current user ID for transaction logging
+          userId: newTrans.userId, // Use userId from transaction object
           type: newTrans.type,
           timestamp: new Date(newTrans.timestamp).toISOString(), // Ensure proper format
           note: newTrans.note,

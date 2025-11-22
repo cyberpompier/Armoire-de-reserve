@@ -9,7 +9,7 @@ interface ActionModalProps {
   currentUser: User | null;
   users: User[];
   transactions: Transaction[];
-  onAction: (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => void;
+  onAction: (action: 'LOAN' | 'RETURN', userId?: string, reason?: string, note?: string) => Promise<void>;
   onEdit?: (item: Equipment) => void;
 }
 
@@ -39,10 +39,11 @@ export const ActionModal: React.FC<ActionModalProps> = ({
 
   if (!isOpen || !item) return null;
 
-  const handleConfirm = (action: 'LOAN' | 'RETURN') => {
+  const handleConfirm = async (action: 'LOAN' | 'RETURN') => {
     // Configuration de l'email commune
     const recipient = 'sebastien.dupressoir@sdis60.fr';
     const userEmail = (currentUser as any)?.email;
+    let mailtoLink = '';
 
     if (action === 'LOAN') {
       const subject = `Sortie EPI : ${item.type} - ${item.barcode}`;
@@ -62,8 +63,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Je m’engage à le restituer propre, et je signalerais toutes anomalies, via l’application.\n\n` +
         `Cordialement`;
 
-      const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.location.href = mailtoLink;
+      mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     } 
     else if (action === 'RETURN') {
       const assignedUser = users.find(u => u.id === item.assignedTo);
@@ -82,11 +82,19 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         `Date : ${new Date().toLocaleString('fr-FR')}\n\n` +
         `Cordialement`;
 
-      const mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      window.location.href = mailtoLink;
+      mailtoLink = `mailto:${recipient}?cc=${userEmail || ''}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     }
 
-    onAction(action, selectedUser, loanReason, note);
+    try {
+      // Await the database action first
+      await onAction(action, selectedUser, loanReason, note);
+      // Only if successful, trigger the email client
+      window.location.href = mailtoLink;
+    } catch (error) {
+      // Error is handled and toasted in App.tsx, so we just log it here
+      // and prevent the email client from opening.
+      console.error("Transaction failed, not opening email client.", error);
+    }
   };
 
   // Get history for this item
