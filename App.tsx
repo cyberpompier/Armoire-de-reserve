@@ -54,9 +54,9 @@ const App: React.FC = () => {
   const fetchSharedData = async () => {
     setLoadingData(true);
     try {
-      // 1. Inventaire - Table renommée
+      // 1. Inventaire - Table corrigée
       const { data: equipmentData, error: eqError } = await supabase
-        .from('armoire_equipement')
+        .from('armoire_equipment')
         .select('*');
       
       if (eqError) throw eqError;
@@ -72,7 +72,7 @@ const App: React.FC = () => {
         imageUrl: e.image_url
       }));
 
-      // 2. Transactions - Table renommée
+      // 2. Transactions
       const { data: transData, error: trError } = await supabase
         .from('armoire_transactions')
         .select('*')
@@ -179,7 +179,7 @@ const App: React.FC = () => {
         note: newTrans.note
       });
 
-      await supabase.from('armoire_equipement').update({
+      await supabase.from('armoire_equipment').update({
         status: newStatus,
         assigned_to: assigneeId || null
       }).eq('id', newTrans.equipmentId);
@@ -197,9 +197,9 @@ const App: React.FC = () => {
     }));
     setActiveTab('stock');
 
-    // DB - Table renommée
+    // DB - Table corrigée
     try {
-      await supabase.from('armoire_equipement').insert({
+      await supabase.from('armoire_equipment').insert({
         id: eq.id,
         type: eq.type,
         size: eq.size,
@@ -223,9 +223,9 @@ const App: React.FC = () => {
       )
     }));
 
-    // DB - Table renommée
+    // DB - Table corrigée
     try {
-      await supabase.from('armoire_equipement').update({
+      await supabase.from('armoire_equipment').update({
         type: updatedItem.type,
         size: updatedItem.size,
         barcode: updatedItem.barcode,
@@ -246,9 +246,9 @@ const App: React.FC = () => {
       inventory: prev.inventory.filter(item => item.id !== itemId)
     }));
 
-    // DB - Table renommée
+    // DB - Table corrigée
     try {
-      await supabase.from('armoire_equipement').delete().eq('id', itemId);
+      await supabase.from('armoire_equipment').delete().eq('id', itemId);
     } catch (err) {
       console.error("Erreur delete DB:", err);
     }

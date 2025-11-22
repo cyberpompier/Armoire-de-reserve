@@ -1,5 +1,5 @@
 -- Table des équipements
-CREATE TABLE public.armoire_equipement (
+CREATE TABLE public.armoire_equipment (
     id text PRIMARY KEY,
     type text NOT NULL,
     size text,
@@ -14,7 +14,7 @@ CREATE TABLE public.armoire_equipement (
 -- Table des transactions (historique)
 CREATE TABLE public.armoire_transactions (
     id text PRIMARY KEY,
-    equipment_id text REFERENCES public.armoire_equipement(id) ON DELETE CASCADE,
+    equipment_id text REFERENCES public.armoire_equipment(id) ON DELETE CASCADE,
     user_id uuid REFERENCES auth.users(id),
     type text, -- 'OUT' ou 'IN'
     timestamp bigint,
@@ -24,11 +24,11 @@ CREATE TABLE public.armoire_transactions (
 );
 
 -- Activer RLS
-ALTER TABLE public.armoire_equipement ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.armoire_equipment ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.armoire_transactions ENABLE ROW LEVEL SECURITY;
 
 -- Politiques de sécurité
-CREATE POLICY "Enable all for authenticated users" ON public.armoire_equipement
+CREATE POLICY "Enable all for authenticated users" ON public.armoire_equipment
     FOR ALL USING (auth.role() = 'authenticated');
 
 CREATE POLICY "Enable all for authenticated users" ON public.armoire_transactions
