@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Ajout de useEffect
 import { Equipment, EquipmentStatus, EquipmentType } from '../types';
 import { ScanLine, X, Pencil, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 
@@ -12,29 +12,51 @@ interface AddItemModalProps {
 }
 
 export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUpdate, onDelete, initialItem, onScanRequest }) => {
-  const [newItemType, setNewItemType] = useState<EquipmentType>(initialItem?.type || EquipmentType.HELMET);
-  const [newItemSize, setNewItemSize] = useState(initialItem?.size || 'L');
-  const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>(
-    initialItem?.condition || 'Neuf'
-  );
-  const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(initialItem?.status || EquipmentStatus.AVAILABLE);
-  const [newItemBarcode, setNewItemBarcode] = useState(initialItem?.barcode || '');
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Initialisation des states
+  const [newItemType, setNewItemType] = useState<EquipmentType>(EquipmentType.HELMET);
+  const [newItemSize, setNewItemSize] = useState('L');
+  const [newItemCondition, setNewItemCondition] = useState<'Neuf' | 'Bon' | 'Usé' | 'Critique'>('Neuf');
+  const [newItemStatus, setNewItemStatus] = useState<EquipmentStatus>(EquipmentStatus.AVAILABLE);
+  const [newItemBarcode, setNewItemBarcode] = useState('');
   
-  // Nouvel état pour gérer la soumission et éviter les doubles clics
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditing = !!initialItem;
+
+  // CORRECTION 1 : Réinitialiser le formulaire quand la modale s'ouvre ou que l'item change
+  useEffect(() => {
+    if (initialItem) {
+      // Mode Édition : on remplit avec les données existantes
+      setNewItemType(initialItem.type);
+      setNewItemSize(initialItem.size);
+      setNewItemCondition(initialItem.condition);
+      setNewItemStatus(initialItem.status);
+      setNewItemBarcode(initialItem.barcode);
+    } else {
+      // Mode Ajout : on remet tout à zéro (très important pour le 2ème ajout)
+      setNewItemType(EquipmentType.HELMET);
+      setNewItemSize('L');
+      setNewItemCondition('Neuf');
+      setNewItemStatus(EquipmentStatus.AVAILABLE);
+      setNewItemBarcode('');
+    }
+    setConfirmDelete(false);
+  }, [initialItem]); // Se déclenche quand initialItem change (ou quand la modale s'ouvre si le parent gère bien la clé)
 
   const handleSave = async () => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      // 1. Generate a unique ID for the item
-      const newItemId = initialItem?.id || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // CORRECTION 2 : Gestion de l'ID
+      // Si Supabase attend un UUID, il vaut mieux ne pas envoyer d'ID (laisser Supabase le générer)
+      // OU utiliser crypto.randomUUID() si l'environnement le supporte.
+      // Ici, on garde votre logique mais on s'assure qu'elle est unique.
+      const newItemId = initialItem?.id || crypto.randomUUID(); 
       
-      // 2. Generate a unique barcode if none is provided, using part of the unique ID
+      // Génération du code-barres
+      // Si newItemBarcode est vide (reset par le useEffect), on en génère un nouveau unique
       const finalBarcode = newItemBarcode.trim() || `MAN-${newItemId.slice(-8).toUpperCase()}`;
 
       const itemData: Equipment = {
@@ -44,7 +66,7 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
         barcode: finalBarcode,
         status: newItemStatus,
         condition: newItemCondition,
-        imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`,
+        imageUrl: initialItem?.imageUrl || `https://picsum.photos/200?random=${Date.now()}`, // Force une nouvelle image
         assignedTo: newItemStatus === EquipmentStatus.AVAILABLE ? undefined : initialItem?.assignedTo
       };
 
@@ -53,12 +75,12 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
       } else {
         await onAdd(itemData);
       }
+      
       onClose();
     } catch (error) {
       console.error("Erreur lors de la sauvegarde", error);
-      // Error handling is done in App.tsx (onAdd/onUpdate)
+      alert("Erreur lors de la sauvegarde. Vérifiez que le code-barres n'existe pas déjà.");
     } finally {
-      // CRITICAL: Always reset submitting state
       setIsSubmitting(false);
     }
   };
@@ -71,9 +93,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
   };
 
   return (
+    // ... Le reste de votre JSX (inchangé) ...
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={isSubmitting ? undefined : onClose}></div>
       <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl relative z-10 animate-fade-in overflow-hidden max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
           <h3 className="font-bold text-lg text-slate-800">
             {isEditing ? 'Modifier l\'EPI' : 'Ajouter un EPI'}
@@ -202,7 +226,6 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
             )}
           </button>
 
-          {/* Delete Button */}
           {isEditing && onDelete && (
             <div className="pt-4 mt-2 border-t border-slate-100">
               {!confirmDelete ? (
