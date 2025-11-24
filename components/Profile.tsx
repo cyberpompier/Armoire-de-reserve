@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2 } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2, AlertTriangle } from 'lucide-react';
 
 interface UserProfile {
   nom: string | null;
@@ -15,13 +15,14 @@ interface UserProfile {
 
 interface ProfileProps {
   session: Session | null;
+  isProfileIncomplete?: boolean;
+  onProfileUpdate?: () => void;
 }
 
-export const Profile: React.FC<ProfileProps> = ({ session }) => {
+export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, onProfileUpdate }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   
-  // États pour l'édition
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UserProfile>({
     nom: '',
@@ -37,7 +38,6 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
   useEffect(() => {
     const getProfileData = async () => {
       try {
-        // Optimisation : On utilise la session passée en props au lieu de refaire un appel getUser()
         const user = session?.user;
 
         if (user) {
@@ -48,7 +48,6 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
             .single();
 
           if (error) {
-            // Si pas de profil (nouvel utilisateur), on pré-remplit avec l'email
             setFormData(prev => ({ ...prev, email: user.email || '' }));
           } else {
             setProfile(data);
@@ -67,6 +66,13 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
     }
   }, [session]);
 
+  useEffect(() => {
+    // Ouvre automatiquement la fenêtre d'édition si le profil est incomplet
+    if (isProfileIncomplete) {
+      setIsEditing(true);
+    }
+  }, [isProfileIncomplete]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
   };
@@ -79,17 +85,23 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
   const handleSave = async () => {
     const user = session?.user;
     if (!user) return;
+
+    // Ajout d'une validation avant la sauvegarde
+    if (!formData.nom || !formData.prenom || !formData.grade) {
+      alert('Veuillez remplir au minimum votre nom, prénom et grade.');
+      return;
+    }
     
     setSaving(true);
     try {
       const updates = {
-        id: user.id, // Requis pour upsert (création)
+        id: user.id,
         nom: formData.nom,
         prenom: formData.prenom,
         matricule: formData.matricule,
         grade: formData.grade,
         caserne: formData.caserne,
-        email: user.email, // On s'assure que l'email est sauvegardé
+        email: user.email,
         updated_at: new Date().toISOString(),
       };
 
@@ -101,6 +113,11 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
 
       setProfile({ ...formData, email: user.email || null, avatar: profile?.avatar || null });
       setIsEditing(false);
+      
+      // Notifie le composant parent que le profil a été mis à jour
+      if (onProfileUpdate) {
+        onProfileUpdate();
+      }
     } catch (error: any) {
       console.error('Erreur lors de la mise à jour:', error);
       alert('Erreur lors de la sauvegarde du profil : ' + error.message);
@@ -125,6 +142,22 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
 
   return (
     <div className="p-6 pb-24 animate-fade-in relative">
+       {isProfileIncomplete && (
+         <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg shadow-sm">
+           <div className="flex items-start gap-3">
+             <div className="shrink-0 pt-0.5">
+               <AlertTriangle className="w-5 h-5 text-yellow-500" />
+             </div>
+             <div>
+               <p className="font-bold text-yellow-800">Profil incomplet</p>
+               <p className="text-sm text-yellow-700 mt-1">
+                 Veuillez compléter vos informations pour accéder à l'application.
+               </p>
+             </div>
+           </div>
+         </div>
+       )}
+
        <header className="mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Mon Profil</h1>
           <p className="text-slate-500 text-sm">Compte personnel</p>
@@ -217,14 +250,13 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
          UID: {session?.user.id.slice(0, 8)}...
        </p>
 
-       {/* MODAL D'ÉDITION */}
        {isEditing && (
          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => setIsEditing(false)}></div>
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onClick={() => !isProfileIncomplete && setIsEditing(false)}></div>
             <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-900">Modifier le profil</h3>
-                <button onClick={() => setIsEditing(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200">
+                <button onClick={() => !isProfileIncomplete && setIsEditing(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isProfileIncomplete}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
@@ -232,7 +264,7 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Prénom</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Prénom *</label>
                     <input 
                       type="text" 
                       name="prenom"
@@ -242,7 +274,7 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-500 mb-1">Nom</label>
+                    <label className="block text-xs font-medium text-slate-500 mb-1">Nom *</label>
                     <input 
                       type="text" 
                       name="nom"
@@ -284,7 +316,7 @@ export const Profile: React.FC<ProfileProps> = ({ session }) => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Grade</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Grade *</label>
                   <select 
                     name="grade"
                     value={formData.grade || ''}

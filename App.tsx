@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
     setIsLoadingData(true);
@@ -51,12 +52,21 @@ const App: React.FC = () => {
 
   const fetchUserProfile = useCallback(async (userId: string, email?: string) => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    
     if (data) {
+      // Un profil est incomplet si le nom, prénom ou grade est manquant
+      if (!data.nom || !data.prenom || !data.grade) {
+        setIsProfileIncomplete(true);
+      } else {
+        setIsProfileIncomplete(false);
+      }
       setCurrentUser({
         id: userId, email, name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
         rank: data.grade || 'Sapeur', role: data.role || 'pompier'
       });
     } else {
+      // Si aucun profil n'existe, il est forcément incomplet
+      setIsProfileIncomplete(true);
       setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
     }
   }, []);
@@ -80,6 +90,7 @@ const App: React.FC = () => {
       } else {
         setCurrentUser(null);
         setState(INITIAL_STATE);
+        setIsProfileIncomplete(false);
       }
     });
     return () => subscription.unsubscribe();
@@ -186,6 +197,24 @@ const App: React.FC = () => {
   if (isLoadingData) return <div>Chargement...</div>;
   if (!session) return <Login />;
 
+  // Si le profil est incomplet, on affiche uniquement la page de profil
+  if (isProfileIncomplete) {
+    return (
+      <div className="h-full w-full bg-slate-50 flex justify-center">
+        <ToastProvider />
+        <main className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col">
+          <div className="flex-1 overflow-y-auto bg-slate-50/50">
+            <Profile 
+              session={session} 
+              isProfileIncomplete={true}
+              onProfileUpdate={() => fetchUserProfile(session.user.id, session.user.email)}
+            />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full w-full bg-slate-50 flex justify-center">
       <ToastProvider />
@@ -202,7 +231,7 @@ const App: React.FC = () => {
               onTransaction={handleTransaction}
             />
           )}
-          {activeTab === 'profile' && <Profile session={session} />}
+          {activeTab === 'profile' && <Profile session={session} onProfileUpdate={() => fetchUserProfile(session.user.id, session.user.email)} />}
         </div>
         <nav className="shrink-0 bg-white border-t px-6 py-2 flex justify-between">
           <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-fire-600' : 'text-slate-400'}>
