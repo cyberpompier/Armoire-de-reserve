@@ -137,12 +137,18 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                     Attribué à : <span className="font-bold">{users.find(u => u.id === primaryItem.assignedTo)?.name || 'Inconnu'}</span>
                   </p>
               </div>
-              <button 
-                onClick={() => handleConfirm('RETURN')}
-                className="w-full bg-green-600 text-white py-4 rounded-xl font-bold"
-              >
-                Confirmer le Retour
-              </button>
+              {(isAdmin || primaryItem.assignedTo === currentUser?.id) ? (
+                <button 
+                  onClick={() => handleConfirm('RETURN')}
+                  className="w-full bg-green-600 text-white py-4 rounded-xl font-bold"
+                >
+                  Confirmer le Retour
+                </button>
+              ) : (
+                <div className="w-full bg-slate-100 text-slate-500 py-4 rounded-xl font-bold text-center text-sm cursor-not-allowed">
+                  Retour par l'emprunteur uniquement
+                </div>
+              )}
             </div>
           )}
         </div>
