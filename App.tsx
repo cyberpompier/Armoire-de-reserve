@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; 
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Settings, UserCircle, Mail } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
 import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
+import { generateMailtoLink, sendTransactionNotification } from './services/notificationService';
 
 const INITIAL_STATE: AppState = { inventory: [], users: [], transactions: [] };
 
@@ -54,7 +56,6 @@ const App: React.FC = () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     
     if (data) {
-      // Un profil est incomplet si le nom, prénom ou grade est manquant
       if (!data.nom || !data.prenom || !data.grade) {
         setIsProfileIncomplete(true);
       } else {
@@ -65,7 +66,6 @@ const App: React.FC = () => {
         rank: data.grade || 'Sapeur', role: data.role || 'pompier'
       });
     } else {
-      // Si aucun profil n'existe, il est forcément incomplet
       setIsProfileIncomplete(true);
       setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
     }
@@ -97,7 +97,18 @@ const App: React.FC = () => {
   }, [fetchUserProfile, fetchInitialData]);
 
   const handleTransaction = async (transactions: Transaction[], newStatus: EquipmentStatus, assigneeId?: string) => {
-    const loadingToastId = showLoading("Enregistrement...");
+    // --- PARTIE EMAIL (OPTIMISTE) ---
+    try {
+      const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
+      if (mailtoLink) {
+        sendTransactionNotification(mailtoLink);
+      }
+    } catch (e) {
+      console.error("Erreur lors de la préparation de l'email", e);
+    }
+
+    // --- PARTIE BASE DE DONNEES ---
+    const loadingToastId = showLoading("Enregistrement BDD...");
     try {
       const equipmentIds = transactions.map(t => t.equipmentId);
       
@@ -122,10 +133,11 @@ const App: React.FC = () => {
       }));
       
       dismissToast(loadingToastId);
-      showSuccess("Opération réussie !");
+      showSuccess("Mouvement enregistré !");
+
     } catch (error: any) {
       dismissToast(loadingToastId);
-      showError(`Erreur: ${error.message}`);
+      showError(`Erreur BDD: ${error.message}`);
       throw error;
     }
   };
@@ -145,7 +157,7 @@ const App: React.FC = () => {
 
       if (pairId) {
         await supabase.from('armoire_equipment').update({ pairId: newEquipment.id }).eq('id', pairId);
-        await fetchInitialData(); // Refresh all data to ensure consistency
+        await fetchInitialData(); 
       } else {
         setState(prev => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
       }
@@ -177,7 +189,7 @@ const App: React.FC = () => {
         await supabase.from('armoire_equipment').update({ pairId: returnedItem.id }).eq('id', pairId);
       }
       
-      await fetchInitialData(); // Easiest way to sync state after complex update
+      await fetchInitialData(); 
       dismissToast(toastId);
       showSuccess("Équipement mis à jour.");
     } catch (error: any) {
@@ -188,7 +200,6 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
-    // This needs to be enhanced to handle un-pairing
     await supabase.from('armoire_equipment').delete().eq('id', itemId);
     await fetchInitialData();
     showSuccess("Équipement supprimé.");
@@ -197,7 +208,6 @@ const App: React.FC = () => {
   if (isLoadingData) return <div>Chargement...</div>;
   if (!session) return <Login />;
 
-  // Si le profil est incomplet, on affiche uniquement la page de profil
   if (isProfileIncomplete) {
     return (
       <div className="h-full w-full bg-slate-50 flex justify-center">
