@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import toast from 'react-hot-toast'; // Import direct pour personnaliser le toast
+import toast from 'react-hot-toast'; 
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
@@ -10,7 +10,7 @@ import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
 import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
-import { sendTransactionNotification } from './services/notificationService';
+import { generateMailtoLink, sendTransactionNotification } from './services/notificationService';
 
 const INITIAL_STATE: AppState = { inventory: [], users: [], transactions: [] };
 
@@ -56,7 +56,6 @@ const App: React.FC = () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     
     if (data) {
-      // Un profil est incomplet si le nom, prénom ou grade est manquant
       if (!data.nom || !data.prenom || !data.grade) {
         setIsProfileIncomplete(true);
       } else {
@@ -67,7 +66,6 @@ const App: React.FC = () => {
         rank: data.grade || 'Sapeur', role: data.role || 'pompier'
       });
     } else {
-      // Si aucun profil n'existe, il est forcément incomplet
       setIsProfileIncomplete(true);
       setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
     }
@@ -125,35 +123,41 @@ const App: React.FC = () => {
       
       dismissToast(loadingToastId);
       
-      // Tentative d'envoi automatique
-      // Note: Peut être bloqué par le navigateur car déclenché après un 'await'
-      sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
+      // Génération du lien mailto
+      const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
 
-      // Affichage d'un toast interactif PERSISTANT (duration: Infinity)
-      // Cela permet à l'utilisateur de cliquer manuellement si l'auto-ouverture a échoué
-      toast((t) => (
-        <div className="flex flex-col gap-3 min-w-[200px]">
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm">Transaction enregistrée !</span>
+      if (mailtoLink) {
+        // Tentative d'ouverture automatique (peut échouer selon le navigateur)
+        sendTransactionNotification(mailtoLink);
+
+        // Affichage d'un toast interactif PERSISTANT pour forcer l'ouverture manuellement
+        toast((t) => (
+          <div className="flex flex-col gap-3 min-w-[220px]">
+            <span className="font-bold text-sm">✅ Mouvement enregistré !</span>
+            <button 
+              onClick={() => {
+                sendTransactionNotification(mailtoLink);
+                toast.dismiss(t.id);
+              }}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-lg flex items-center gap-2 justify-center font-bold text-xs shadow-md active:scale-95 transition-all"
+            >
+              <Mail size={16} />
+              CLIQUEZ ICI POUR ENVOYER L'EMAIL
+            </button>
+            <p className="text-[10px] text-slate-500 italic text-center">
+              Si l'application mail ne s'ouvre pas,<br/>cliquez sur le bouton ci-dessus.
+            </p>
+            <button 
+               onClick={() => toast.dismiss(t.id)}
+               className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
+            >
+              Fermer
+            </button>
           </div>
-          <button 
-            onClick={() => {
-              sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
-              toast.dismiss(t.id);
-            }}
-            className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-2.5 rounded-lg flex items-center gap-2 justify-center font-bold shadow-sm active:scale-95 transition-all"
-          >
-            <Mail size={14} />
-            Notifier Sébastien par Email
-          </button>
-          <button 
-             onClick={() => toast.dismiss(t.id)}
-             className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
-          >
-            Fermer
-          </button>
-        </div>
-      ), { duration: Infinity, icon: '✅' });
+        ), { duration: Infinity });
+      } else {
+        showSuccess("Opération réussie !");
+      }
 
     } catch (error: any) {
       dismissToast(loadingToastId);
