@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; // Import direct pour personnaliser le toast
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Settings, UserCircle, Mail } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
@@ -113,7 +114,6 @@ const App: React.FC = () => {
       const { error: transError } = await supabase.from('armoire_transactions').insert(transactionData);
       if (transError) throw transError;
 
-      // Update Local State
       setState(prevState => ({
         ...prevState,
         inventory: prevState.inventory.map(item => {
@@ -123,11 +123,28 @@ const App: React.FC = () => {
         transactions: [...transactions, ...prevState.transactions]
       }));
       
-      // Trigger Email Notification (Non-blocking)
+      dismissToast(loadingToastId);
+      
+      // Tentative d'envoi automatique
       sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
 
-      dismissToast(loadingToastId);
-      showSuccess("Opération réussie !");
+      // Affichage d'un toast interactif au cas où le mailto est bloqué
+      toast((t) => (
+        <div className="flex flex-col gap-2">
+          <span className="font-bold">Opération réussie !</span>
+          <button 
+            onClick={() => {
+              sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
+              toast.dismiss(t.id);
+            }}
+            className="text-xs bg-slate-900 text-white px-3 py-2 rounded-lg flex items-center gap-2 justify-center"
+          >
+            <Mail size={14} />
+            Forcer l'ouverture Email
+          </button>
+        </div>
+      ), { duration: 5000, icon: '✅' });
+
     } catch (error: any) {
       dismissToast(loadingToastId);
       showError(`Erreur: ${error.message}`);
@@ -150,7 +167,7 @@ const App: React.FC = () => {
 
       if (pairId) {
         await supabase.from('armoire_equipment').update({ pairId: newEquipment.id }).eq('id', pairId);
-        await fetchInitialData(); // Refresh all data to ensure consistency
+        await fetchInitialData(); 
       } else {
         setState(prev => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
       }
@@ -182,7 +199,7 @@ const App: React.FC = () => {
         await supabase.from('armoire_equipment').update({ pairId: returnedItem.id }).eq('id', pairId);
       }
       
-      await fetchInitialData(); // Easiest way to sync state after complex update
+      await fetchInitialData(); 
       dismissToast(toastId);
       showSuccess("Équipement mis à jour.");
     } catch (error: any) {
@@ -193,7 +210,6 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
-    // This needs to be enhanced to handle un-pairing
     await supabase.from('armoire_equipment').delete().eq('id', itemId);
     await fetchInitialData();
     showSuccess("Équipement supprimé.");
@@ -202,7 +218,6 @@ const App: React.FC = () => {
   if (isLoadingData) return <div>Chargement...</div>;
   if (!session) return <Login />;
 
-  // Si le profil est incomplet, on affiche uniquement la page de profil
   if (isProfileIncomplete) {
     return (
       <div className="h-full w-full bg-slate-50 flex justify-center">
