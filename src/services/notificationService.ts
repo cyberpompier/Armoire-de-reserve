@@ -13,7 +13,7 @@ export const generateMailtoLink = (
   const type = transactions[0].type === 'OUT' ? 'EMPRUNT' : 'RESTITUTION';
   const performerName = currentUser ? currentUser.name : 'Inconnu';
 
-  // Version ultra-concise pour éviter les limites de longueur d'URL (max ~2000 chars)
+  // Corps du message simplifié
   let body = `FIRE-STOCK - ${type}\n`;
   body += `Par: ${performerName}\n\n`;
 
@@ -36,7 +36,8 @@ export const generateMailtoLink = (
 };
 
 export const sendTransactionNotification = (mailtoLink: string) => {
-  // Tentative d'ouverture standard
-  // _self force l'ouverture dans le contexte actuel, souvent mieux toléré pour mailto
-  window.open(mailtoLink, '_self');
+  // Redirection directe : C'est la seule méthode qui fonctionne de manière fiable
+  // sur mobile sans être bloquée par les pop-up blockers, à condition
+  // d'être appelée dans la pile d'exécution synchrone du clic utilisateur.
+  window.location.href = mailtoLink;
 };

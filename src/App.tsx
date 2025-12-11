@@ -97,7 +97,20 @@ const App: React.FC = () => {
   }, [fetchUserProfile, fetchInitialData]);
 
   const handleTransaction = async (transactions: Transaction[], newStatus: EquipmentStatus, assigneeId?: string) => {
-    const loadingToastId = showLoading("Enregistrement...");
+    // --- PARTIE EMAIL (OPTIMISTE) ---
+    // On génère et ouvre le lien TOUT DE SUITE, avant toute attente asynchrone.
+    // C'est le seul moyen de garantir l'ouverture sur mobile.
+    try {
+      const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
+      if (mailtoLink) {
+        sendTransactionNotification(mailtoLink);
+      }
+    } catch (e) {
+      console.error("Erreur lors de la préparation de l'email", e);
+    }
+
+    // --- PARTIE BASE DE DONNEES ---
+    const loadingToastId = showLoading("Enregistrement BDD...");
     try {
       const equipmentIds = transactions.map(t => t.equipmentId);
       
@@ -122,46 +135,13 @@ const App: React.FC = () => {
       }));
       
       dismissToast(loadingToastId);
-      
-      // Génération du lien mailto
-      const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
-
-      if (mailtoLink) {
-        // Tentative d'ouverture automatique (peut échouer selon le navigateur)
-        sendTransactionNotification(mailtoLink);
-
-        // Affichage d'un toast interactif PERSISTANT pour forcer l'ouverture manuellement
-        toast((t) => (
-          <div className="flex flex-col gap-3 min-w-[220px]">
-            <span className="font-bold text-sm">✅ Mouvement enregistré !</span>
-            <button 
-              onClick={() => {
-                sendTransactionNotification(mailtoLink);
-                toast.dismiss(t.id);
-              }}
-              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-lg flex items-center gap-2 justify-center font-bold text-xs shadow-md active:scale-95 transition-all"
-            >
-              <Mail size={16} />
-              CLIQUEZ ICI POUR ENVOYER L'EMAIL
-            </button>
-            <p className="text-[10px] text-slate-500 italic text-center">
-              Si l'application mail ne s'ouvre pas,<br/>cliquez sur le bouton ci-dessus.
-            </p>
-            <button 
-               onClick={() => toast.dismiss(t.id)}
-               className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
-            >
-              Fermer
-            </button>
-          </div>
-        ), { duration: Infinity });
-      } else {
-        showSuccess("Opération réussie !");
-      }
+      showSuccess("Mouvement enregistré !");
 
     } catch (error: any) {
       dismissToast(loadingToastId);
-      showError(`Erreur: ${error.message}`);
+      showError(`Erreur BDD: ${error.message}`);
+      // Note : L'email a peut-être déjà été ouvert, mais c'est un compromis acceptable
+      // pour assurer l'automatisme sur mobile.
       throw error;
     }
   };
