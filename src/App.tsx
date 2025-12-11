@@ -126,24 +126,34 @@ const App: React.FC = () => {
       dismissToast(loadingToastId);
       
       // Tentative d'envoi automatique
+      // Note: Peut être bloqué par le navigateur car déclenché après un 'await'
       sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
 
-      // Affichage d'un toast interactif au cas où le mailto est bloqué
+      // Affichage d'un toast interactif PERSISTANT (duration: Infinity)
+      // Cela permet à l'utilisateur de cliquer manuellement si l'auto-ouverture a échoué
       toast((t) => (
-        <div className="flex flex-col gap-2">
-          <span className="font-bold">Opération réussie !</span>
+        <div className="flex flex-col gap-3 min-w-[200px]">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-sm">Transaction enregistrée !</span>
+          </div>
           <button 
             onClick={() => {
               sendTransactionNotification(transactions, state.inventory, state.users, currentUser);
               toast.dismiss(t.id);
             }}
-            className="text-xs bg-slate-900 text-white px-3 py-2 rounded-lg flex items-center gap-2 justify-center"
+            className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-2.5 rounded-lg flex items-center gap-2 justify-center font-bold shadow-sm active:scale-95 transition-all"
           >
             <Mail size={14} />
-            Forcer l'ouverture Email
+            Notifier Sébastien par Email
+          </button>
+          <button 
+             onClick={() => toast.dismiss(t.id)}
+             className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
+          >
+            Fermer
           </button>
         </div>
-      ), { duration: 5000, icon: '✅' });
+      ), { duration: Infinity, icon: '✅' });
 
     } catch (error: any) {
       dismissToast(loadingToastId);

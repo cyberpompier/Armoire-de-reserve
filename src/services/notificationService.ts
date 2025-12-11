@@ -14,15 +14,16 @@ export const sendTransactionNotification = async (
   const timestamp = new Date().toLocaleString('fr-FR');
   const performerName = currentUser ? `${currentUser.rank} ${currentUser.name}` : 'Inconnu';
 
-  // Utilisation de \r\n pour une meilleure compatibilité des sauts de ligne dans mailto
-  let body = `NOTIFICATION FIRE-STOCK\r\n`;
-  body += `------------------------------------------------\r\n`;
-  body += `TYPE : ${type}\r\n`;
-  body += `DATE : ${timestamp}\r\n`;
-  body += `OPERATEUR : ${performerName}\r\n`;
-  body += `------------------------------------------------\r\n\r\n`;
+  // Construction du corps de l'email
+  // Utilisation de encodeURIComponent pour le sujet et le corps garantit que les caractères spéciaux passent bien
+  let body = `NOTIFICATION FIRE-STOCK\n`;
+  body += `------------------------------------------------\n`;
+  body += `TYPE : ${type}\n`;
+  body += `DATE : ${timestamp}\n`;
+  body += `OPERATEUR : ${performerName}\n`;
+  body += `------------------------------------------------\n\n`;
 
-  body += `DÉTAILS DES ÉQUIPEMENTS :\r\n`;
+  body += `DÉTAILS DES ÉQUIPEMENTS :\n`;
 
   transactions.forEach(t => {
     const item = inventory.find(i => i.id === t.equipmentId);
@@ -30,32 +31,27 @@ export const sendTransactionNotification = async (
     const targetName = targetUser ? `${targetUser.rank} ${targetUser.name}` : 'N/A';
     
     if (item) {
-      body += `- ${item.type} (Ref: ${item.barcode})\r\n`;
-      body += `  État: ${item.condition} | Taille: ${item.size}\r\n`;
+      body += `- ${item.type} (Ref: ${item.barcode})\n`;
+      body += `  État: ${item.condition} | Taille: ${item.size}\n`;
       if (t.type === 'OUT') {
-        body += `  Attribué à : ${targetName}\r\n`;
-        if (t.reason) body += `  Motif : ${t.reason}\r\n`;
+        body += `  Attribué à : ${targetName}\n`;
+        if (t.reason) body += `  Motif : ${t.reason}\n`;
       } else {
-        body += `  Rendu par : ${targetName}\r\n`;
+        body += `  Rendu par : ${targetName}\n`;
       }
-      if (t.note) body += `  Note : ${t.note}\r\n`;
-      body += `\r\n`;
+      if (t.note) body += `  Note : ${t.note}\n`;
+      body += `\n`;
     }
   });
 
-  body += `------------------------------------------------\r\n`;
-  body += `Généré par FireStock.\r\n`;
+  body += `------------------------------------------------\n`;
+  body += `Généré par FireStock.\n`;
 
   const subject = `[FireStock] Mouvement de stock - ${type}`;
 
-  // Création d'un lien invisible et simulation de clic
-  // Cette méthode est souvent plus robuste que window.location.href pour les mailto
   const mailtoLink = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   
-  const link = document.createElement('a');
-  link.href = mailtoLink;
-  link.target = '_blank'; // Force l'ouverture dans un contexte séparé pour éviter de bloquer l'UI
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
+  // Méthode standard : Redirection directe vers le protocole mailto.
+  // C'est la méthode la plus fiable sur mobile et desktop.
+  window.location.href = mailtoLink;
 };
