@@ -1,5 +1,4 @@
-import { Equipment, Transaction, User, EquipmentStatus } from '../types';
-import { supabase } from '../supabaseClient';
+import { Equipment, Transaction, User } from '../types';
 
 const ADMIN_EMAIL = 'sebastien.dupressoir@sdis60.fr';
 
@@ -45,22 +44,10 @@ export const sendTransactionNotification = async (
   });
 
   body += `------------------------------------------------\n`;
-  body += `Ceci est un message automatique généré par FireStock.\n`;
+  body += `Généré par FireStock.\n`;
 
-  console.log(`[EMAIL SIMULATION] To: ${ADMIN_EMAIL}`);
-  console.log(body);
+  const subject = `[FireStock] Mouvement de stock - ${type}`;
 
-  // Tentative d'appel à une Edge Function Supabase (si configurée)
-  // Si aucune fonction n'existe, cela échouera silencieusement dans la console sans bloquer l'app
-  try {
-    await supabase.functions.invoke('send-email', {
-      body: {
-        to: ADMIN_EMAIL,
-        subject: `[FireStock] Mouvement de stock - ${type}`,
-        text: body
-      }
-    });
-  } catch (e) {
-    console.warn("L'envoi automatique nécessite une Edge Function Supabase configurée.", e);
-  }
+  // Ouverture du client mail par défaut avec les informations pré-remplies
+  window.location.href = `mailto:${ADMIN_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 };
