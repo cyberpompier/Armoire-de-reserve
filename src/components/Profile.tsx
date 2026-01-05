@@ -52,7 +52,6 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
         const user = session?.user;
 
         if (user) {
-          // 1. Profil de base
           const { data: profileData, error } = await supabase
             .from('profiles')
             .select('nom, prenom, avatar, matricule, email, grade, caserne')
@@ -66,7 +65,6 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
             setFormData(prev => ({ ...prev, email: user.email || '' }));
           }
 
-          // 2. Équipements en cours
           const { data: loanData } = await supabase
             .from('armoire_equipment')
             .select('*')
@@ -74,7 +72,6 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
           
           if (loanData) setCurrentLoans(loanData);
 
-          // 3. Historique (jointure manuelle pour avoir les noms des EPI)
           const { data: historyData } = await supabase
             .from('armoire_transactions')
             .select(`
@@ -271,10 +268,37 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
                <Mail className="w-3 h-3" />
                {profile?.email || session?.user.email}
             </div>
+
+            <div className="flex gap-2 justify-center w-full flex-wrap">
+              {profile?.matricule && (
+                <div className="flex items-center gap-1.5 text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-100 font-medium">
+                  <BadgeInfo className="w-3 h-3" />
+                  {profile.matricule}
+                </div>
+              )}
+              {profile?.caserne && (
+                <div className="flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-3 py-1 rounded-full border border-slate-200 font-medium">
+                  <Building2 className="w-3 h-3" />
+                  {profile.caserne}
+                </div>
+              )}
+            </div>
           </div>
        </div>
 
        <div className="space-y-3">
+         <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                 <Shield className="w-5 h-5" />
+               </div>
+               <div>
+                 <p className="text-sm font-bold text-slate-700">Statut</p>
+                 <p className="text-xs text-slate-500">Compte vérifié</p>
+               </div>
+            </div>
+         </div>
+
          <button 
             onClick={() => setIsEditing(true)}
             className="w-full bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-center gap-3 active:scale-[0.99] transition-transform hover:bg-slate-50 group"
@@ -347,6 +371,10 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
        >
          <LogOut className="w-4 h-4" /> Se déconnecter
        </button>
+       
+       <p className="mt-6 text-[10px] text-slate-300 text-center font-mono">
+         UID: {session?.user.id.slice(0, 8)}...
+       </p>
 
        {isEditing && (
          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
