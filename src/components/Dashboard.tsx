@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, EquipmentStatus, EquipmentType } from '../types';
-import { ShieldAlert, Package, Activity, Sparkles, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
+import { AppState, EquipmentStatus, EquipmentType, User } from '../types';
+import { ShieldAlert, Package, Activity, Sparkles, ArrowUpRight, ArrowDownLeft, Clock, User as UserIcon } from 'lucide-react';
 import { analyzeStockStatus } from '../services/geminiService';
 
 interface DashboardProps {
   state: AppState;
+  currentUser: User | null;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ state, currentUser }) => {
   const [insight, setInsight] = useState<string | null>(null);
   const [loadingInsight, setLoadingInsight] = useState(false);
 
@@ -16,8 +17,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   const damagedItems = state.inventory.filter(i => i.status === EquipmentStatus.DAMAGED).length;
   const availableItems = state.inventory.filter(i => i.status === EquipmentStatus.AVAILABLE).length;
 
+  // Calcul du stock par type
   const stockByType = Object.values(EquipmentType).map(type => {
     const totalCount = state.inventory.filter(i => i.type === type && i.status === EquipmentStatus.AVAILABLE).length;
+    
+    // Spécificité Gants : On divise par 2 pour afficher les PAIRES
+    // On utilise Math.floor pour ne compter que les paires complètes
     const displayCount = type === EquipmentType.GLOVES ? Math.floor(totalCount / 2) : totalCount;
 
     return {
@@ -38,12 +43,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
     }
   };
 
+  // Get recent transactions sorted by date
   const recentTransactions = [...state.transactions]
     .sort((a, b) => b.timestamp - a.timestamp)
     .slice(0, 5);
 
   const getAiInsight = async () => {
     setLoadingInsight(true);
+    // Simplify data to save tokens
     const simpleInv = state.inventory.map(i => ({ t: i.type, s: i.status, c: i.condition }));
     const text = await analyzeStockStatus(JSON.stringify(simpleInv));
     setInsight(text);
@@ -57,11 +64,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
           <h1 className="text-2xl font-bold text-slate-900">Tableau de Bord</h1>
           <p className="text-slate-500 text-sm">Gestion de Stock EPI • CIS Principal</p>
         </div>
-        <div className="h-10 w-10 bg-fire-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-fire-200">
-          P
+        <div className="h-10 w-10 bg-fire-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-fire-200 overflow-hidden border-2 border-white">
+          {currentUser?.avatar ? (
+            <img src={currentUser.avatar} alt="Profil" className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-sm">{currentUser?.name?.charAt(0) || 'P'}</span>
+          )}
         </div>
       </header>
 
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
           <div className="bg-green-100 p-2 rounded-full mb-2">
@@ -79,6 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
           <span className="text-xs text-slate-500 font-medium">Sortis</span>
         </div>
 
+        {/* Détail par type */}
         <div className="col-span-2">
             <h3 className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider ml-1">Détail Stock Disponible</h3>
             <div className="grid grid-cols-3 gap-2">
@@ -113,6 +126,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
         </div>
       </div>
 
+      {/* Recent Activity Feed */}
       <div>
         <div className="flex items-center gap-2 mb-3 px-1">
           <Clock className="w-4 h-4 text-slate-500" />
@@ -130,7 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                 const item = state.inventory.find(i => i.id === t.equipmentId);
                 const user = state.users.find(u => u.id === t.userId);
                 const date = new Date(t.timestamp);
-                const trans = t as any;
+                const trans = t as any; // Access dynamic properties
                 
                 return (
                   <div key={t.id} className="p-4 flex items-start gap-3">
@@ -146,11 +160,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                       <p className="text-xs text-slate-500 truncate">
                         {user ? `${user.rank} ${user.name}` : 'Système'}
                       </p>
+                      
+                      {/* Display Reason */}
                       {t.type === 'OUT' && trans.reason && (
                         <span className="inline-block mt-1 px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[10px] text-slate-600 font-medium">
                            {trans.reason}
                         </span>
                       )}
+                      
+                      {/* Display Note */}
                       {trans.note && (
                         <p className="mt-1.5 text-xs text-slate-600 italic bg-slate-50 p-2 rounded border border-slate-100">
                           "{trans.note}"
@@ -173,12 +191,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
         </div>
       </div>
 
+      {/* AI Insight Section */}
       <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-5 shadow-lg text-white relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-fire-600 rounded-full opacity-20 blur-2xl"></div>
+        
         <div className="flex items-center gap-2 mb-3">
           <Sparkles className="w-5 h-5 text-yellow-400" />
           <h3 className="font-bold text-lg">Assistant Logistique IA</h3>
         </div>
+
         <div className="min-h-[80px] text-sm text-slate-300 leading-relaxed">
           {loadingInsight ? (
              <div className="flex items-center gap-2 animate-pulse">
@@ -193,6 +214,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
             <p>Appuyez pour générer un rapport d'état instantané sur votre réserve.</p>
           )}
         </div>
+
         <button 
           onClick={getAiInsight}
           disabled={loadingInsight}

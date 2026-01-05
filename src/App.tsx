@@ -40,7 +40,8 @@ const App: React.FC = () => {
         name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur',
         rank: p.grade || '', 
         role: p.role || 'pompier', 
-        email: p.email
+        email: p.email,
+        avatar: p.avatar
       }));
 
       setState({
@@ -86,7 +87,8 @@ const App: React.FC = () => {
           email: email, 
           name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
           rank: data.grade || 'Sapeur', 
-          role: data.role || 'pompier'
+          role: data.role || 'pompier',
+          avatar: data.avatar
         });
       } else {
         setIsProfileIncomplete(true);
@@ -306,7 +308,7 @@ const App: React.FC = () => {
       <ToastProvider />
       <main className="w-full max-w-md h-full bg-white shadow-2xl flex flex-col">
         <div className="flex-1 overflow-y-auto bg-slate-50/50">
-          {activeTab === 'dashboard' && <Dashboard state={state} />}
+          {activeTab === 'dashboard' && <Dashboard state={state} currentUser={currentUser} />}
           {activeTab === 'stock' && (
             <StockManager 
               state={state} 
