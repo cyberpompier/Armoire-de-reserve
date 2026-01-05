@@ -22,8 +22,9 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
+  // Charge les données globales (Stock, Historique, Annuaire)
   const fetchInitialData = useCallback(async () => {
-    setIsLoadingData(true);
+    // On ne met pas isLoadingData(true) ici pour éviter le clignotement si on rafraichit juste les données
     try {
       const [usersRes, inventoryRes, transactionsRes] = await Promise.all([
         supabase.from('profiles').select('*'),
@@ -31,69 +32,112 @@ const App: React.FC = () => {
         supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
       ]);
 
-      if (usersRes.error) throw usersRes.error;
       if (inventoryRes.error) throw inventoryRes.error;
-      if (transactionsRes.error) throw transactionsRes.error;
-
-      const directory: User[] = usersRes.data.map((p: any) => ({
-        id: p.id, name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Inconnu',
-        rank: p.grade || '', role: p.role || 'pompier', email: p.email
+      
+      // Si usersRes fail, on continue quand même avec une liste vide pour ne pas bloquer l'app
+      const directory: User[] = (usersRes.data || []).map((p: any) => ({
+        id: p.id, 
+        name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur',
+        rank: p.grade || '', 
+        role: p.role || 'pompier', 
+        email: p.email
       }));
 
       setState({
         users: directory,
-        inventory: inventoryRes.data as Equipment[],
-        transactions: transactionsRes.data as Transaction[]
+        inventory: (inventoryRes.data || []) as Equipment[],
+        transactions: (transactionsRes.data || []) as Transaction[]
       });
-    } catch (e) {
-      showError("Erreur de chargement des données");
-    } finally {
-      setIsLoadingData(false);
+    } catch (e: any) {
+      console.error("Erreur fetchInitialData:", e);
+      // On n'affiche pas d'erreur bloquante ici pour laisser l'UI s'afficher
     }
   }, []);
 
+  // Charge ET répare le profil utilisateur courant
   const fetchUserProfile = useCallback(async (userId: string, email?: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
-    
-    if (data) {
-      if (!data.nom || !data.prenom || !data.grade) {
-        setIsProfileIncomplete(true);
-      } else {
-        setIsProfileIncomplete(false);
+    try {
+      let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+      // Si le profil n'existe pas (Erreur PGRST116) ou est null, on le crée
+      if (!data || (error && error.code === 'PGRST116')) {
+        console.log("Profil manquant, création automatique...");
+        const newProfile = {
+          id: userId,
+          email: email,
+          role: 'pompier',
+          updated_at: new Date().toISOString()
+        };
+        
+        const { error: insertError } = await supabase.from('profiles').insert(newProfile);
+        if (insertError) {
+          console.error("Erreur création profil:", insertError);
+        } else {
+          data = newProfile; // On utilise le profil qu'on vient de créer
+        }
       }
-      setCurrentUser({
-        id: userId, email, name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
-        rank: data.grade || 'Sapeur', role: data.role || 'pompier'
-      });
-    } else {
-      setIsProfileIncomplete(true);
-      setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
+
+      if (data) {
+        // Vérification de la complétude du profil
+        const isIncomplete = !data.nom || !data.prenom || !data.grade;
+        setIsProfileIncomplete(isIncomplete);
+        
+        setCurrentUser({
+          id: userId, 
+          email: email, 
+          name: `${data.nom?.toUpperCase() || ''} ${data.prenom || ''}`.trim() || 'Utilisateur',
+          rank: data.grade || 'Sapeur', 
+          role: data.role || 'pompier'
+        });
+      } else {
+        // Fallback ultime si la création échoue
+        setIsProfileIncomplete(true);
+        setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
+      }
+    } catch (err) {
+      console.error("Erreur fetchUserProfile:", err);
     }
   }, []);
 
+  // Gestion de la session et du démarrage
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        fetchUserProfile(session.user.id, session.user.email);
-        fetchInitialData();
-      } else {
+    let mounted = true;
+
+    const initApp = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        setSession(session);
+        if (session) {
+          await fetchUserProfile(session.user.id, session.user.email);
+          await fetchInitialData();
+        }
         setIsLoadingData(false);
       }
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      if (session) {
-        fetchUserProfile(session.user.id, session.user.email);
-        fetchInitialData();
-      } else {
-        setCurrentUser(null);
-        setState(INITIAL_STATE);
-        setIsProfileIncomplete(false);
+    initApp();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (mounted) {
+        setSession(session);
+        if (session) {
+          setIsLoadingData(true);
+          await fetchUserProfile(session.user.id, session.user.email);
+          await fetchInitialData();
+          setIsLoadingData(false);
+        } else {
+          setCurrentUser(null);
+          setState(INITIAL_STATE);
+          setIsProfileIncomplete(false);
+          setIsLoadingData(false);
+        }
       }
     });
-    return () => subscription.unsubscribe();
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [fetchUserProfile, fetchInitialData]);
 
   const handleTransaction = async (transactions: Transaction[], newStatus: EquipmentStatus, assigneeId?: string) => {
@@ -123,14 +167,10 @@ const App: React.FC = () => {
       
       dismissToast(loadingToastId);
       
-      // Génération du lien mailto
       const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
 
       if (mailtoLink) {
-        // Tentative d'ouverture automatique (peut échouer selon le navigateur)
         sendTransactionNotification(mailtoLink);
-
-        // Affichage d'un toast interactif PERSISTANT pour forcer l'ouverture manuellement
         toast((t) => (
           <div className="flex flex-col gap-3 min-w-[220px]">
             <span className="font-bold text-sm">✅ Mouvement enregistré !</span>
@@ -144,15 +184,7 @@ const App: React.FC = () => {
               <Mail size={16} />
               CLIQUEZ ICI POUR ENVOYER L'EMAIL
             </button>
-            <p className="text-[10px] text-slate-500 italic text-center">
-              Si l'application mail ne s'ouvre pas,<br/>cliquez sur le bouton ci-dessus.
-            </p>
-            <button 
-               onClick={() => toast.dismiss(t.id)}
-               className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
-            >
-              Fermer
-            </button>
+            <button onClick={() => toast.dismiss(t.id)} className="text-[10px] text-slate-400 underline text-center">Fermer</button>
           </div>
         ), { duration: Infinity });
       } else {
@@ -229,7 +261,15 @@ const App: React.FC = () => {
     showSuccess("Équipement supprimé.");
   };
 
-  if (isLoadingData) return <div>Chargement...</div>;
+  if (isLoadingData) return (
+    <div className="h-full w-full flex items-center justify-center bg-slate-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-fire-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-slate-500 text-sm font-medium animate-pulse">Chargement FireStock...</p>
+      </div>
+    </div>
+  );
+  
   if (!session) return <Login />;
 
   if (isProfileIncomplete) {
@@ -241,7 +281,10 @@ const App: React.FC = () => {
             <Profile 
               session={session} 
               isProfileIncomplete={true}
-              onProfileUpdate={() => fetchUserProfile(session.user.id, session.user.email)}
+              onProfileUpdate={() => {
+                fetchUserProfile(session.user.id, session.user.email);
+                fetchInitialData();
+              }}
             />
           </div>
         </main>
@@ -265,17 +308,25 @@ const App: React.FC = () => {
               onTransaction={handleTransaction}
             />
           )}
-          {activeTab === 'profile' && <Profile session={session} onProfileUpdate={() => fetchUserProfile(session.user.id, session.user.email)} />}
+          {activeTab === 'profile' && (
+            <Profile 
+              session={session} 
+              onProfileUpdate={() => {
+                fetchUserProfile(session.user.id, session.user.email);
+                fetchInitialData();
+              }} 
+            />
+          )}
         </div>
-        <nav className="shrink-0 bg-white border-t px-6 py-2 flex justify-between">
-          <button onClick={() => setActiveTab('dashboard')} className={activeTab === 'dashboard' ? 'text-fire-600' : 'text-slate-400'}>
-            <LayoutDashboard /> <span className="text-xs">Accueil</span>
+        <nav className="shrink-0 bg-white border-t px-6 py-2 flex justify-between pb-6 sm:pb-2">
+          <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 ${activeTab === 'dashboard' ? 'text-fire-600' : 'text-slate-400'}`}>
+            <LayoutDashboard size={20} /> <span className="text-[10px] font-bold">Accueil</span>
           </button>
-          <button onClick={() => setActiveTab('stock')} className={activeTab === 'stock' ? 'text-fire-600' : 'text-slate-400'}>
-            <PackageSearch /> <span className="text-xs">Stock</span>
+          <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center gap-1 ${activeTab === 'stock' ? 'text-fire-600' : 'text-slate-400'}`}>
+            <PackageSearch size={20} /> <span className="text-[10px] font-bold">Stock</span>
           </button>
-          <button onClick={() => setActiveTab('profile')} className={activeTab === 'profile' ? 'text-fire-600' : 'text-slate-400'}>
-            <UserCircle /> <span className="text-xs">Profil</span>
+          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 ${activeTab === 'profile' ? 'text-fire-600' : 'text-slate-400'}`}>
+            <UserCircle size={20} /> <span className="text-[10px] font-bold">Profil</span>
           </button>
         </nav>
       </main>
