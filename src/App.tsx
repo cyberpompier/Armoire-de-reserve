@@ -64,9 +64,7 @@ const App: React.FC = () => {
         };
         
         const { error: insertError } = await supabase.from('profiles').insert(newProfile);
-        if (insertError) {
-          console.error("Erreur création profil:", insertError);
-        } else {
+        if (!insertError) {
           data = newProfile;
         }
       }
@@ -85,57 +83,64 @@ const App: React.FC = () => {
         });
       } else {
         setIsProfileIncomplete(true);
-        setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
       }
     } catch (err) {
       console.error("Erreur fetchUserProfile:", err);
       setIsProfileIncomplete(true);
-      setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    const initApp = async () => {
+    // Sécurité : Forcer la fin du chargement après 5 secondes maximum
+    const timeout = setTimeout(() => {
+      if (mounted && isLoadingData) {
+        console.warn("Chargement long : fin forcée.");
+        setIsLoadingData(false);
+      }
+    }, 5000);
+
+    const initAuth = async () => {
       try {
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
         if (mounted) {
-          setSession(currentSession);
-          if (currentSession) {
+          setSession(initialSession);
+          if (initialSession) {
             await Promise.all([
-              fetchUserProfile(currentSession.user.id, currentSession.user.email),
+              fetchUserProfile(initialSession.user.id, initialSession.user.email),
               fetchInitialData()
             ]);
           }
         }
       } catch (error) {
-        console.error("Erreur initialisation:", error);
+        console.error("Erreur initialisation auth:", error);
       } finally {
         if (mounted) setIsLoadingData(false);
       }
     };
 
-    initApp();
+    initAuth();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, newSession: Session | null) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       if (!mounted) return;
       
-      setSession(newSession);
+      const sessionChanged = (session?.user.id !== newSession?.user.id);
       
-      if (newSession) {
+      if (newSession && sessionChanged) {
+        setSession(newSession);
         setIsLoadingData(true);
         try {
           await Promise.all([
             fetchUserProfile(newSession.user.id, newSession.user.email),
             fetchInitialData()
           ]);
-        } catch (error) {
-          console.error("Erreur chargement session:", error);
         } finally {
-          setIsLoadingData(false);
+          if (mounted) setIsLoadingData(false);
         }
-      } else {
+      } else if (!newSession) {
+        setSession(null);
         setCurrentUser(null);
         setState(INITIAL_STATE);
         setIsProfileIncomplete(false);
@@ -145,6 +150,7 @@ const App: React.FC = () => {
 
     return () => {
       mounted = false;
+      clearTimeout(timeout);
       subscription.unsubscribe();
     };
   }, [fetchUserProfile, fetchInitialData]);
