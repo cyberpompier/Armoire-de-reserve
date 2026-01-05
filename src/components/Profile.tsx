@@ -326,8 +326,8 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
                 <>
                   {displayedHistory.map((trans) => (
                     <div key={trans.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
-                      <div className={`p-2 rounded-lg ${trans.type === 'take' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                        {trans.type === 'take' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                      <div className={`p-2 rounded-lg ${trans.type === 'OUT' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        {trans.type === 'OUT' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-bold text-slate-800 truncate">
@@ -337,8 +337,8 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
                           {new Date(trans.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                      <div className={`text-[10px] font-bold px-2 py-1 rounded-full ${trans.type === 'take' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                        {trans.type === 'take' ? 'EMPRUNT' : 'RETOUR'}
+                      <div className={`text-[10px] font-bold px-2 py-1 rounded-full ${trans.type === 'OUT' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {trans.type === 'OUT' ? 'EMPRUNT' : 'RETOUR'}
                       </div>
                     </div>
                   ))}
