@@ -22,7 +22,6 @@ const App: React.FC = () => {
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
-  // Charge les données globales (Stock, Historique, Annuaire)
   const fetchInitialData = useCallback(async () => {
     try {
       const [usersRes, inventoryRes, transactionsRes] = await Promise.all([
@@ -31,9 +30,7 @@ const App: React.FC = () => {
         supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
       ]);
 
-      if (inventoryRes.error) {
-        console.error("Erreur chargement inventaire:", inventoryRes.error);
-      }
+      if (inventoryRes.error) console.error("Erreur chargement inventaire:", inventoryRes.error);
       
       const directory: User[] = (usersRes.data || []).map((p: any) => ({
         id: p.id, 
@@ -54,14 +51,11 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Charge ET répare le profil utilisateur courant
   const fetchUserProfile = useCallback(async (userId: string, email?: string) => {
     try {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
-      // Si le profil n'existe pas (Erreur PGRST116 ou null), on le crée
       if (!data || (error && error.code === 'PGRST116')) {
-        console.log("Profil manquant, création automatique...");
         const newProfile = {
           id: userId,
           email: email,
@@ -78,7 +72,6 @@ const App: React.FC = () => {
       }
 
       if (data) {
-        // Vérification de la complétude du profil
         const isIncomplete = !data.nom || !data.prenom || !data.grade;
         setIsProfileIncomplete(isIncomplete);
         
@@ -96,24 +89,24 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erreur fetchUserProfile:", err);
-      // En cas d'erreur critique, on laisse l'utilisateur entrer mais en mode "Profil incomplet"
       setIsProfileIncomplete(true);
       setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
     }
   }, []);
 
-  // Gestion de la session et du démarrage
   useEffect(() => {
     let mounted = true;
 
     const initApp = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
         if (mounted) {
-          setSession(session);
-          if (session) {
-            await fetchUserProfile(session.user.id, session.user.email);
-            await fetchInitialData();
+          setSession(currentSession);
+          if (currentSession) {
+            await Promise.all([
+              fetchUserProfile(currentSession.user.id, currentSession.user.email),
+              fetchInitialData()
+            ]);
           }
         }
       } catch (error) {
@@ -125,20 +118,28 @@ const App: React.FC = () => {
 
     initApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
-      if (mounted) {
-        setSession(session);
-        if (session) {
-          setIsLoadingData(true);
-          await fetchUserProfile(session.user.id, session.user.email);
-          await fetchInitialData();
-          setIsLoadingData(false);
-        } else {
-          setCurrentUser(null);
-          setState(INITIAL_STATE);
-          setIsProfileIncomplete(false);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, newSession: Session | null) => {
+      if (!mounted) return;
+      
+      setSession(newSession);
+      
+      if (newSession) {
+        setIsLoadingData(true);
+        try {
+          await Promise.all([
+            fetchUserProfile(newSession.user.id, newSession.user.email),
+            fetchInitialData()
+          ]);
+        } catch (error) {
+          console.error("Erreur chargement session:", error);
+        } finally {
           setIsLoadingData(false);
         }
+      } else {
+        setCurrentUser(null);
+        setState(INITIAL_STATE);
+        setIsProfileIncomplete(false);
+        setIsLoadingData(false);
       }
     });
 
