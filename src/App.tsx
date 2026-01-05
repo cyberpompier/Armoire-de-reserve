@@ -334,7 +334,7 @@ const App: React.FC = () => {
             <LayoutDashboard size={20} /> <span className="text-[10px] font-bold">Accueil</span>
           </button>
           <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center gap-1 ${activeTab === 'stock' ? 'text-fire-600' : 'text-slate-400'}`}>
-            <PackageSearch size={20} /> <span className="text-[10px] font-bold">Stock</span>
+            <PackageSearch size={20} /> <span className="text-[10px] font-bold">Emprunter</span>
           </button>
           <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 ${activeTab === 'profile' ? 'text-fire-600' : 'text-slate-400'}`}>
             <UserCircle size={20} /> <span className="text-[10px] font-bold">Profil</span>

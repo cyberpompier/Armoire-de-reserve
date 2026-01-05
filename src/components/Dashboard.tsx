@@ -62,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, currentUser }) => {
       <header className="flex justify-between items-center mb-2">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Tableau de Bord</h1>
-          <p className="text-slate-500 text-sm">Gestion de Stock EPI • CIS Principal</p>
+          <p className="text-slate-500 text-sm">Gestion de Stock EPI • CIS Noyon</p>
         </div>
         <div className="h-10 w-10 bg-fire-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg shadow-fire-200 overflow-hidden border-2 border-white">
           {currentUser?.avatar ? (
