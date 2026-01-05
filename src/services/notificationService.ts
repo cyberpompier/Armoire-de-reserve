@@ -13,7 +13,6 @@ export const generateMailtoLink = (
   const type = transactions[0].type === 'OUT' ? 'EMPRUNT' : 'RESTITUTION';
   const performerName = currentUser ? currentUser.name : 'Inconnu';
 
-  // Version ultra-concise pour éviter les limites de longueur d'URL (max ~2000 chars)
   let body = `FIRE-STOCK - ${type}\n`;
   body += `Par: ${performerName}\n\n`;
 
@@ -36,7 +35,5 @@ export const generateMailtoLink = (
 };
 
 export const sendTransactionNotification = (mailtoLink: string) => {
-  // Tentative d'ouverture standard
-  // _self force l'ouverture dans le contexte actuel, souvent mieux toléré pour mailto
   window.open(mailtoLink, '_self');
 };

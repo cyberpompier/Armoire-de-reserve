@@ -7,7 +7,7 @@ import { Profile } from './components/Profile';
 import { Login } from './components/Login';
 import { LayoutDashboard, PackageSearch, Settings, UserCircle, Mail } from 'lucide-react';
 import { supabase } from './supabaseClient';
-import { Session } from '@supabase/supabase-js';
+import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
 import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
 import { generateMailtoLink, sendTransactionNotification } from './services/notificationService';
@@ -123,7 +123,7 @@ const App: React.FC = () => {
 
     initApp();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event: AuthChangeEvent, session: Session | null) => {
       if (mounted) {
         setSession(session);
         if (session) {
@@ -162,10 +162,10 @@ const App: React.FC = () => {
       const { error: transError } = await supabase.from('armoire_transactions').insert(transactionData);
       if (transError) throw transError;
 
-      setState(prevState => ({
+      setState((prevState: AppState) => ({
         ...prevState,
-        inventory: prevState.inventory.map(item => {
-          const updated = updatedItems.find(u => u.id === item.id);
+        inventory: prevState.inventory.map((item: Equipment) => {
+          const updated = updatedItems.find((u: any) => u.id === item.id);
           return updated ? updated as Equipment : item;
         }),
         transactions: [...transactions, ...prevState.transactions]
@@ -224,7 +224,7 @@ const App: React.FC = () => {
         await supabase.from('armoire_equipment').update({ pairId: newEquipment.id }).eq('id', pairId);
         await fetchInitialData(); 
       } else {
-        setState(prev => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
+        setState((prev: AppState) => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
       }
       
       dismissToast(toastId);
