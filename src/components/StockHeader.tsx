@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, QrCode } from 'lucide-react';
+import { Search, Plus, QrCode, X } from 'lucide-react';
 import { EquipmentStatus } from '../types';
 
 interface StockHeaderProps {
@@ -29,10 +29,18 @@ export const StockHeader: React.FC<StockHeaderProps> = ({
           <input 
             type="text" 
             placeholder="Rechercher EPI, Matricule..." 
-            className="w-full pl-9 pr-4 py-2 bg-white rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-fire-500 focus:border-transparent outline-none"
+            className="w-full pl-9 pr-10 py-2 bg-white rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-fire-500 focus:border-transparent outline-none"
             value={search}
             onChange={e => onSearchChange(e.target.value)}
           />
+          {search.length > 0 && (
+            <button 
+              onClick={() => onSearchChange('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-100 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
         
         <button 
