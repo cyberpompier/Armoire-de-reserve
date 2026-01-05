@@ -5,7 +5,7 @@ import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, UserCircle, Mail, Loader2 } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, UserCircle, Mail, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
@@ -20,6 +20,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'stock' | 'profile'>('dashboard');
   const [state, setState] = useState<AppState>(INITIAL_STATE);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isProfileIncomplete, setIsProfileIncomplete] = useState(false);
 
   const fetchInitialData = useCallback(async () => {
@@ -30,7 +31,8 @@ const App: React.FC = () => {
         supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
       ]);
 
-      if (inventoryRes.error) console.error("Erreur chargement inventaire:", inventoryRes.error);
+      if (inventoryRes.error) throw inventoryRes.error;
+      if (usersRes.error) throw usersRes.error;
       
       const directory: User[] = (usersRes.data || []).map((p: any) => ({
         id: p.id, 
@@ -46,8 +48,10 @@ const App: React.FC = () => {
         inventory: (inventoryRes.data || []) as Equipment[],
         transactions: (transactionsRes.data || []) as Transaction[]
       });
+      return true;
     } catch (e: any) {
       console.error("Erreur fetchInitialData:", e);
+      return false;
     }
   }, []);
 
@@ -81,64 +85,52 @@ const App: React.FC = () => {
           role: data.role || 'pompier',
           avatar: data.avatar
         });
-      } else {
-        setIsProfileIncomplete(true);
+        return true;
       }
+      return false;
     } catch (err) {
       console.error("Erreur fetchUserProfile:", err);
-      setIsProfileIncomplete(true);
+      return false;
     }
   }, []);
+
+  const initApp = useCallback(async () => {
+    setIsLoadingData(true);
+    setLoadError(null);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      
+      if (currentSession) {
+        const [profileSuccess, dataSuccess] = await Promise.all([
+          fetchUserProfile(currentSession.user.id, currentSession.user.email),
+          fetchInitialData()
+        ]);
+        
+        if (!profileSuccess || !dataSuccess) {
+          setLoadError("Certaines données n'ont pas pu être chargées.");
+        }
+      }
+    } catch (error: any) {
+      setLoadError("Erreur de connexion à la base de données.");
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, [fetchUserProfile, fetchInitialData]);
 
   useEffect(() => {
     let mounted = true;
 
-    // Sécurité : Forcer la fin du chargement après 5 secondes maximum
-    const timeout = setTimeout(() => {
-      if (mounted && isLoadingData) {
-        console.warn("Chargement long : fin forcée.");
-        setIsLoadingData(false);
-      }
-    }, 5000);
+    initApp();
 
-    const initAuth = async () => {
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (mounted) {
-          setSession(initialSession);
-          if (initialSession) {
-            await Promise.all([
-              fetchUserProfile(initialSession.user.id, initialSession.user.email),
-              fetchInitialData()
-            ]);
-          }
-        }
-      } catch (error) {
-        console.error("Erreur initialisation auth:", error);
-      } finally {
-        if (mounted) setIsLoadingData(false);
-      }
-    };
-
-    initAuth();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
       if (!mounted) return;
       
-      const sessionChanged = (session?.user.id !== newSession?.user.id);
+      const sessionChanged = session?.user.id !== newSession?.user.id;
       
-      if (newSession && sessionChanged) {
+      if (newSession && (sessionChanged || event === 'SIGNED_IN')) {
         setSession(newSession);
-        setIsLoadingData(true);
-        try {
-          await Promise.all([
-            fetchUserProfile(newSession.user.id, newSession.user.email),
-            fetchInitialData()
-          ]);
-        } finally {
-          if (mounted) setIsLoadingData(false);
-        }
+        initApp();
       } else if (!newSession) {
         setSession(null);
         setCurrentUser(null);
@@ -150,10 +142,9 @@ const App: React.FC = () => {
 
     return () => {
       mounted = false;
-      clearTimeout(timeout);
       subscription.unsubscribe();
     };
-  }, [fetchUserProfile, fetchInitialData]);
+  }, [initApp, session]);
 
   const handleTransaction = async (transactions: Transaction[], newStatus: EquipmentStatus, assigneeId?: string) => {
     const loadingToastId = showLoading("Enregistrement...");
@@ -279,19 +270,39 @@ const App: React.FC = () => {
     showSuccess("Équipement supprimé.");
   };
 
-  if (isLoadingData) return (
+  if (isLoadingData || loadError) return (
     <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-      <div className="flex flex-col items-center gap-6 p-8 bg-white rounded-3xl shadow-xl shadow-slate-200/50">
-        <div className="relative">
-          <Loader2 className="w-16 h-16 text-orange-600 animate-spin" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-6 h-6 bg-orange-100 rounded-full animate-pulse"></div>
-          </div>
-        </div>
-        <div className="text-center">
-          <p className="text-slate-900 text-lg font-bold">FireStock</p>
-          <p className="text-slate-400 text-xs font-medium mt-1">Initialisation sécurisée...</p>
-        </div>
+      <div className="flex flex-col items-center gap-6 p-8 bg-white rounded-3xl shadow-xl shadow-slate-200/50 w-full max-w-xs">
+        {loadError ? (
+          <>
+            <div className="p-4 bg-red-50 rounded-full">
+              <AlertCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <div className="text-center">
+              <p className="text-slate-900 font-bold">Oups !</p>
+              <p className="text-slate-500 text-xs mt-1">{loadError}</p>
+            </div>
+            <button 
+              onClick={initApp}
+              className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl font-bold text-sm active:scale-95 transition-all"
+            >
+              <RefreshCw size={16} /> Réessayer
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="relative">
+              <Loader2 className="w-16 h-16 text-orange-600 animate-spin" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-6 h-6 bg-orange-100 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-slate-900 text-lg font-bold">FireStock</p>
+              <p className="text-slate-400 text-xs font-medium mt-1">Chargement des données...</p>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -307,10 +318,7 @@ const App: React.FC = () => {
             <Profile 
               session={session} 
               isProfileIncomplete={true}
-              onProfileUpdate={() => {
-                fetchUserProfile(session.user.id, session.user.email);
-                fetchInitialData();
-              }}
+              onProfileUpdate={() => initApp()}
             />
           </div>
         </main>
@@ -337,10 +345,7 @@ const App: React.FC = () => {
           {activeTab === 'profile' && (
             <Profile 
               session={session} 
-              onProfileUpdate={() => {
-                fetchUserProfile(session.user.id, session.user.email);
-                fetchInitialData();
-              }} 
+              onProfileUpdate={() => initApp()} 
             />
           )}
         </div>
