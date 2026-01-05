@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Equipment, EquipmentStatus, Transaction, User } from '../types';
-import { History, User as UserIcon, Pencil, Link2, AlertCircle } from 'lucide-react';
+import { History, User as UserIcon, Pencil, Link2, AlertCircle, Check, X } from 'lucide-react';
 
 interface ActionModalProps {
   isOpen: boolean;
@@ -26,6 +26,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [note, setNote] = useState('');
   const [loanReason, setLoanReason] = useState<string>('Intervention');
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'LOAN' | 'RETURN' | null>(null);
 
   useEffect(() => {
     if (isOpen && currentUser) {
@@ -33,6 +35,8 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     }
     setNote('');
     setLoanReason('Intervention');
+    setShowConfirm(false);
+    setPendingAction(null);
   }, [isOpen, currentUser]);
 
   if (!isOpen || !items || items.length === 0) return null;
@@ -41,13 +45,20 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   const isPair = items.length > 1;
   const isAdmin = currentUser?.role === 'admin';
   
-  // Vérification des droits : admin ou propriétaire de l'emprunt
   const isOwner = primaryItem.assignedTo === currentUser?.id;
   const canPerformAction = primaryItem.status === EquipmentStatus.AVAILABLE || isAdmin || isOwner;
 
-  const handleConfirm = (action: 'LOAN' | 'RETURN') => {
-    if (!canPerformAction && action === 'RETURN') return;
-    onAction(action, selectedUser, loanReason, note);
+  const initiateAction = (action: 'LOAN' | 'RETURN') => {
+    setPendingAction(action);
+    setShowConfirm(true);
+  };
+
+  const handleFinalConfirm = async () => {
+    if (pendingAction) {
+      await onAction(pendingAction, selectedUser, loanReason, note);
+      setShowConfirm(false);
+      setPendingAction(null);
+    }
   };
 
   const itemHistory = transactions
@@ -59,6 +70,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
     });
 
   const borrower = users.find(u => u.id === primaryItem.assignedTo);
+  const targetUser = users.find(u => u.id === selectedUser);
 
   return (
     <div className="fixed inset-0 z-40 flex items-end justify-center">
@@ -66,6 +78,38 @@ export const ActionModal: React.FC<ActionModalProps> = ({
       <div className="bg-white w-full max-w-md rounded-t-3xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto no-scrollbar">
         <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
         
+        {/* Overlay de Confirmation */}
+        {showConfirm && (
+          <div className="absolute inset-0 z-[60] bg-white/95 backdrop-blur-sm p-8 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-200">
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 ${pendingAction === 'RETURN' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-900'}`}>
+              {pendingAction === 'RETURN' ? <Check size={32} /> : <UserIcon size={32} />}
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Confirmation</h3>
+            <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+              Êtes-vous sûr de vouloir enregistrer ce 
+              <span className="font-bold text-slate-900"> {pendingAction === 'RETURN' ? 'retour' : 'mouvement'}</span> pour 
+              <span className="font-bold text-slate-900"> {primaryItem.type}</span> ?
+              {pendingAction === 'LOAN' && targetUser && (
+                <><br/>Attribué à : <span className="font-bold text-slate-900">{targetUser.name}</span></>
+              )}
+            </p>
+            <div className="flex gap-3 w-full">
+              <button 
+                onClick={() => setShowConfirm(false)}
+                className="flex-1 py-4 px-6 bg-slate-100 text-slate-600 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-all"
+              >
+                <X size={18} /> Annuler
+              </button>
+              <button 
+                onClick={handleFinalConfirm}
+                className={`flex-1 py-4 px-6 text-white rounded-2xl font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all ${pendingAction === 'RETURN' ? 'bg-emerald-600 shadow-emerald-200' : 'bg-slate-900 shadow-slate-200'}`}
+              >
+                <Check size={18} /> Confirmer
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-start mb-6">
           <div className="flex items-start gap-4">
             <img 
@@ -96,7 +140,6 @@ export const ActionModal: React.FC<ActionModalProps> = ({
         </div>
 
         <div className="mb-8">
-          {/* Note / Commentaire - Désactivé si pas de droits */}
           <div className="mb-4">
             <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">Note / Commentaire</label>
             <textarea 
@@ -112,7 +155,6 @@ export const ActionModal: React.FC<ActionModalProps> = ({
             />
           </div>
 
-          {/* Section ACTION : Disponible */}
           {primaryItem.status === EquipmentStatus.AVAILABLE && (
             <div className="space-y-4">
               <div>
@@ -143,7 +185,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
                 </select>
               </div>
               <button 
-                onClick={() => handleConfirm('LOAN')}
+                onClick={() => initiateAction('LOAN')}
                 disabled={!selectedUser}
                 className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform"
               >
@@ -152,7 +194,6 @@ export const ActionModal: React.FC<ActionModalProps> = ({
             </div>
           )}
 
-          {/* Section ACTION : Emprunté */}
           {primaryItem.status === EquipmentStatus.LOANED && (
             <div className="space-y-4">
               <div className={`p-4 rounded-xl flex items-center gap-3 ${isOwner ? 'bg-fire-50 border border-fire-100' : 'bg-slate-100 border border-slate-200'}`}>
@@ -169,7 +210,7 @@ export const ActionModal: React.FC<ActionModalProps> = ({
 
               {canPerformAction ? (
                 <button 
-                  onClick={() => handleConfirm('RETURN')}
+                  onClick={() => initiateAction('RETURN')}
                   className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-emerald-100 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
                 >
                   <CheckCircle size={18} /> Confirmer le Retour
@@ -187,7 +228,6 @@ export const ActionModal: React.FC<ActionModalProps> = ({
           )}
         </div>
 
-        {/* Historique */}
         <div className="border-t border-slate-100 pt-6">
            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
              <History size={14} /> Traçabilité
@@ -218,7 +258,6 @@ export const ActionModal: React.FC<ActionModalProps> = ({
   );
 };
 
-// Petite icône interne manquante
 const CheckCircle = ({ size }: { size: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
 );
