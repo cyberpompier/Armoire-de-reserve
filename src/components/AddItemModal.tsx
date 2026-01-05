@@ -38,6 +38,17 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     }
   }, [initialItem, inventory, isEditing]);
 
+  // Ajuster la taille par défaut si on change de type
+  React.useEffect(() => {
+    if (!isEditing) {
+      if (newItemType === EquipmentType.GLOVES) {
+        setNewItemSize('9');
+      } else {
+        setNewItemSize('L');
+      }
+    }
+  }, [newItemType, isEditing]);
+
   const handleSave = async () => {
     if (!newItemBarcode.trim()) {
       alert("Veuillez saisir un code-barres ou un identifiant.");
@@ -88,6 +99,11 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
     onScanRequest();
     onClose('scan');
   };
+
+  const isGloves = newItemType === EquipmentType.GLOVES;
+  const sizeOptions = isGloves 
+    ? ['6', '7', '8', '9', '10', '11', '12'] 
+    : ['S', 'M', 'L', 'XL', 'XXL'];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -159,10 +175,9 @@ export const AddItemModal: React.FC<AddItemModalProps> = ({ onClose, onAdd, onUp
                   onChange={(e) => setNewItemSize(e.target.value)}
                   className="w-full p-2.5 bg-slate-50 rounded-lg border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
                 >
-                  <option>S</option>
-                  <option>M</option>
-                  <option>L</option>
-                  <option>XL</option>
+                  {sizeOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
                 </select>
               </div>
               <div>
