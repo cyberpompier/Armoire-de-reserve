@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2, AlertTriangle } from 'lucide-react';
+import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2, AlertTriangle, Camera } from 'lucide-react';
 
 interface UserProfile {
   nom: string | null;
@@ -22,6 +22,7 @@ interface ProfileProps {
 export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, onProfileUpdate }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<UserProfile>({
@@ -34,6 +35,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
     caserne: ''
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     const getProfileData = async () => {
@@ -79,6 +81,55 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !session?.user) return;
+
+    setUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+
+      // Upload de l'image (On suppose que le bucket 'avatars' existe et est public)
+      const { error: uploadError } = await supabase.storage
+        .from('banque image habillement') // On réutilise le bucket existant ou un nouveau
+        .upload(`profiles/${fileName}`, file);
+
+      if (uploadError) throw uploadError;
+
+      // Récupération de l'URL publique
+      const { data: { publicUrl } } = supabase.storage
+        .from('banque image habillement')
+        .getPublicUrl(`profiles/${fileName}`);
+
+      // Mise à jour immédiate du profil en base
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar: publicUrl })
+        .eq('id', session.user.id);
+
+      if (updateError) throw updateError;
+
+      // Mise à jour de l'état local
+      setProfile(prev => prev ? { ...prev, avatar: publicUrl } : null);
+      setFormData(prev => ({ ...prev, avatar: publicUrl }));
+      
+      if (onProfileUpdate) {
+        onProfileUpdate();
+      }
+    } catch (error: any) {
+      console.error('Erreur upload avatar:', error);
+      alert("Erreur lors de l'envoi de la photo. Vérifiez les permissions de stockage.");
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
 
   const handleSave = async () => {
@@ -161,17 +212,32 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
        </header>
 
        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col items-center text-center">
-          {profile?.avatar ? (
-            <img 
-              src={profile.avatar} 
-              alt="Avatar" 
-              className="w-24 h-24 rounded-full object-cover mb-4 border-4 border-slate-50 shadow-sm"
-            />
-          ) : (
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400">
-               <UserIcon className="w-10 h-10" />
+          <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
+            {profile?.avatar ? (
+              <img 
+                src={profile.avatar} 
+                alt="Avatar" 
+                className={`w-24 h-24 rounded-full object-cover mb-4 border-4 border-slate-50 shadow-sm transition-opacity ${uploadingAvatar ? 'opacity-50' : 'group-hover:opacity-80'}`}
+              />
+            ) : (
+              <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-4 text-slate-400 border-4 border-slate-50 shadow-sm">
+                 <UserIcon className="w-10 h-10" />
+              </div>
+            )}
+            
+            <div className="absolute bottom-4 right-0 p-1.5 bg-fire-600 text-white rounded-full shadow-lg border-2 border-white">
+              {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
             </div>
-          )}
+            
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              className="hidden" 
+              accept="image/*" 
+              onChange={handleFileChange} 
+              disabled={uploadingAvatar}
+            />
+          </div>
           
           <h2 className="font-bold text-lg text-slate-800 mb-1 capitalize">{displayName}</h2>
           
