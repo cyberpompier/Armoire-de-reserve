@@ -17,10 +17,18 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   const availableItems = state.inventory.filter(i => i.status === EquipmentStatus.AVAILABLE).length;
 
   // Calcul du stock par type
-  const stockByType = Object.values(EquipmentType).map(type => ({
-    type,
-    count: state.inventory.filter(i => i.type === type && i.status === EquipmentStatus.AVAILABLE).length
-  }));
+  const stockByType = Object.values(EquipmentType).map(type => {
+    const totalCount = state.inventory.filter(i => i.type === type && i.status === EquipmentStatus.AVAILABLE).length;
+    
+    // Spécificité Gants : On divise par 2 pour afficher les PAIRES
+    // On utilise Math.floor pour ne compter que les paires complètes
+    const displayCount = type === EquipmentType.GLOVES ? Math.floor(totalCount / 2) : totalCount;
+
+    return {
+      type,
+      count: displayCount
+    };
+  });
 
   const getIcon = (t: string) => {
     switch (t) {
@@ -86,7 +94,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
                     <div key={item.type} className="bg-white border border-slate-100 p-2 rounded-xl flex flex-col items-center justify-center shadow-sm">
                         <span className="text-xl mb-1">{getIcon(item.type)}</span>
                         <span className="text-[10px] font-bold text-slate-600 text-center leading-tight truncate w-full px-1 mb-1">{item.type}</span>
-                        <span className={`text-sm font-extrabold ${item.count > 0 ? 'text-green-600' : 'text-slate-300'}`}>{item.count}</span>
+                        <div className="flex items-baseline gap-0.5">
+                            <span className={`text-sm font-extrabold ${item.count > 0 ? 'text-green-600' : 'text-slate-300'}`}>{item.count}</span>
+                            {item.type === EquipmentType.GLOVES && <span className="text-[9px] text-slate-400 font-medium">prs</span>}
+                        </div>
                     </div>
                 ))}
             </div>
