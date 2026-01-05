@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import toast from 'react-hot-toast'; 
-import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
+import { AppState, Equipment, Transaction, User, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, Settings, UserCircle, Mail } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, UserCircle, Mail, Loader2 } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
@@ -274,10 +274,18 @@ const App: React.FC = () => {
   };
 
   if (isLoadingData) return (
-    <div className="h-full w-full flex items-center justify-center bg-slate-50">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-fire-600 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-slate-500 text-sm font-medium animate-pulse">Chargement FireStock...</p>
+    <div className="h-screen w-full flex items-center justify-center bg-slate-50">
+      <div className="flex flex-col items-center gap-6 p-8 bg-white rounded-3xl shadow-xl shadow-slate-200/50">
+        <div className="relative">
+          <Loader2 className="w-16 h-16 text-orange-600 animate-spin" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="w-6 h-6 bg-orange-100 rounded-full animate-pulse"></div>
+          </div>
+        </div>
+        <div className="text-center">
+          <p className="text-slate-900 text-lg font-bold">FireStock</p>
+          <p className="text-slate-400 text-xs font-medium mt-1">Initialisation sécurisée...</p>
+        </div>
       </div>
     </div>
   );
@@ -331,13 +339,13 @@ const App: React.FC = () => {
           )}
         </div>
         <nav className="shrink-0 bg-white border-t px-6 py-2 flex justify-between pb-6 sm:pb-2">
-          <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 ${activeTab === 'dashboard' ? 'text-fire-600' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 ${activeTab === 'dashboard' ? 'text-orange-600' : 'text-slate-400'}`}>
             <LayoutDashboard size={20} /> <span className="text-[10px] font-bold">Accueil</span>
           </button>
-          <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center gap-1 ${activeTab === 'stock' ? 'text-fire-600' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('stock')} className={`flex flex-col items-center gap-1 ${activeTab === 'stock' ? 'text-orange-600' : 'text-slate-400'}`}>
             <PackageSearch size={20} /> <span className="text-[10px] font-bold">Emprunter</span>
           </button>
-          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 ${activeTab === 'profile' ? 'text-fire-600' : 'text-slate-400'}`}>
+          <button onClick={() => setActiveTab('profile')} className={`flex flex-col items-center gap-1 ${activeTab === 'profile' ? 'text-orange-600' : 'text-slate-400'}`}>
             <UserCircle size={20} /> <span className="text-[10px] font-bold">Profil</span>
           </button>
         </nav>
