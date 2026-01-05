@@ -24,7 +24,6 @@ const App: React.FC = () => {
 
   // Charge les données globales (Stock, Historique, Annuaire)
   const fetchInitialData = useCallback(async () => {
-    // On ne met pas isLoadingData(true) ici pour éviter le clignotement si on rafraichit juste les données
     try {
       const [usersRes, inventoryRes, transactionsRes] = await Promise.all([
         supabase.from('profiles').select('*'),
@@ -32,9 +31,10 @@ const App: React.FC = () => {
         supabase.from('armoire_transactions').select('*').order('timestamp', { ascending: false })
       ]);
 
-      if (inventoryRes.error) throw inventoryRes.error;
+      if (inventoryRes.error) {
+        console.error("Erreur chargement inventaire:", inventoryRes.error);
+      }
       
-      // Si usersRes fail, on continue quand même avec une liste vide pour ne pas bloquer l'app
       const directory: User[] = (usersRes.data || []).map((p: any) => ({
         id: p.id, 
         name: `${p.nom?.toUpperCase() || ''} ${p.prenom || ''}`.trim() || 'Utilisateur',
@@ -50,7 +50,6 @@ const App: React.FC = () => {
       });
     } catch (e: any) {
       console.error("Erreur fetchInitialData:", e);
-      // On n'affiche pas d'erreur bloquante ici pour laisser l'UI s'afficher
     }
   }, []);
 
@@ -59,7 +58,7 @@ const App: React.FC = () => {
     try {
       let { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
-      // Si le profil n'existe pas (Erreur PGRST116) ou est null, on le crée
+      // Si le profil n'existe pas (Erreur PGRST116 ou null), on le crée
       if (!data || (error && error.code === 'PGRST116')) {
         console.log("Profil manquant, création automatique...");
         const newProfile = {
@@ -73,7 +72,7 @@ const App: React.FC = () => {
         if (insertError) {
           console.error("Erreur création profil:", insertError);
         } else {
-          data = newProfile; // On utilise le profil qu'on vient de créer
+          data = newProfile;
         }
       }
 
@@ -90,12 +89,14 @@ const App: React.FC = () => {
           role: data.role || 'pompier'
         });
       } else {
-        // Fallback ultime si la création échoue
         setIsProfileIncomplete(true);
         setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
       }
     } catch (err) {
       console.error("Erreur fetchUserProfile:", err);
+      // En cas d'erreur critique, on laisse l'utilisateur entrer mais en mode "Profil incomplet"
+      setIsProfileIncomplete(true);
+      setCurrentUser({ id: userId, email, name: 'Utilisateur', rank: '', role: 'pompier' });
     }
   }, []);
 
@@ -104,14 +105,19 @@ const App: React.FC = () => {
     let mounted = true;
 
     const initApp = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        setSession(session);
-        if (session) {
-          await fetchUserProfile(session.user.id, session.user.email);
-          await fetchInitialData();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (mounted) {
+          setSession(session);
+          if (session) {
+            await fetchUserProfile(session.user.id, session.user.email);
+            await fetchInitialData();
+          }
         }
-        setIsLoadingData(false);
+      } catch (error) {
+        console.error("Erreur initialisation:", error);
+      } finally {
+        if (mounted) setIsLoadingData(false);
       }
     };
 
@@ -184,6 +190,9 @@ const App: React.FC = () => {
               <Mail size={16} />
               CLIQUEZ ICI POUR ENVOYER L'EMAIL
             </button>
+            <p className="text-[10px] text-slate-500 italic text-center">
+              Si l'application mail ne s'ouvre pas,<br/>cliquez sur le bouton ci-dessus.
+            </p>
             <button onClick={() => toast.dismiss(t.id)} className="text-[10px] text-slate-400 underline text-center">Fermer</button>
           </div>
         ), { duration: Infinity });

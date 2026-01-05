@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
-import { Loader2, ShieldCheck, Flame } from 'lucide-react';
+import { Loader2, ShieldCheck, Flame, CheckCircle } from 'lucide-react';
 
 export const Login = () => {
   const [loading, setLoading] = useState(false);
@@ -18,7 +18,8 @@ export const Login = () => {
 
     try {
       if (isSignUp) {
-        const { error: signUpError } = await supabase.auth.signUp({
+        // Tentative d'inscription
+        const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -27,27 +28,39 @@ export const Login = () => {
             }
           }
         });
+        
         if (signUpError) throw signUpError;
-        setMessage('Compte créé ! Veuillez vérifier votre boîte mail pour confirmer l\'inscription avant de vous connecter.');
-        setIsSignUp(false); // Switch back to login view
+
+        // Si une session est créée immédiatement (pas de confirm email requise par le serveur)
+        if (data.session) {
+          setMessage('Compte créé et connecté avec succès !');
+          // La redirection se fera automatiquement via le listener dans App.tsx
+        } else if (data.user) {
+          // Si l'utilisateur est créé mais pas de session => Email confirm requis
+          setMessage('Compte créé ! Veuillez cliquer sur le lien reçu par email pour activer votre compte.');
+          setIsSignUp(false); // On revient sur l'écran de login
+        }
       } else {
+        // Tentative de connexion
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (signInError) throw signInError;
-        // La redirection est gérée par le listener onAuthStateChange dans App.tsx
       }
     } catch (err: any) {
       console.error("Auth Error:", err);
       let errMsg = "Une erreur est survenue.";
       
+      // Traduction des erreurs courantes Supabase
       if (err.message.includes("Invalid login credentials")) {
         errMsg = "Email ou mot de passe incorrect.";
       } else if (err.message.includes("Email not confirmed")) {
         errMsg = "Veuillez confirmer votre email avant de vous connecter.";
       } else if (err.message.includes("User already registered")) {
-        errMsg = "Cet utilisateur existe déjà.";
+        errMsg = "Cette adresse email est déjà utilisée.";
+      } else if (err.message.includes("Password should be at least")) {
+        errMsg = "Le mot de passe doit contenir au moins 6 caractères.";
       } else {
         errMsg = err.message;
       }
@@ -78,14 +91,15 @@ export const Login = () => {
           </h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-xl flex items-center gap-2">
+            <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 text-xs rounded-xl flex items-center gap-2 animate-fade-in">
               <ShieldCheck className="w-4 h-4 shrink-0" />
               {error}
             </div>
           )}
 
           {message && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-100 text-green-700 text-xs rounded-xl font-medium">
+            <div className="mb-4 p-3 bg-green-50 border border-green-100 text-green-700 text-xs rounded-xl font-medium flex items-center gap-2 animate-fade-in">
+              <CheckCircle className="w-4 h-4 shrink-0" />
               {message}
             </div>
           )}
@@ -118,7 +132,7 @@ export const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform flex items-center justify-center gap-2 mt-2"
+              className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 active:scale-[0.98] transition-transform flex items-center justify-center gap-2 mt-2 disabled:opacity-70"
             >
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (isSignUp ? "S'inscrire" : "Se connecter")}
             </button>
@@ -126,6 +140,7 @@ export const Login = () => {
 
           <div className="mt-6 text-center">
             <button
+              type="button"
               onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }}
               className="text-xs text-slate-500 hover:text-fire-600 transition-colors"
             >
