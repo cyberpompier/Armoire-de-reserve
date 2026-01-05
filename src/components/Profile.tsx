@@ -1,7 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { Session } from '@supabase/supabase-js';
-import { LogOut, User as UserIcon, Shield, Mail, ChevronRight, BadgeInfo, Star, X, Check, Loader2, Building2, AlertTriangle, Camera } from 'lucide-react';
+import { 
+  LogOut, User as UserIcon, Shield, Mail, ChevronRight, 
+  BadgeInfo, Star, X, Check, Loader2, Building2, 
+  AlertTriangle, Camera, Package, History, ArrowUpRight, ArrowDownLeft 
+} from 'lucide-react';
+import { Equipment, Transaction } from '../types';
 
 interface UserProfile {
   nom: string | null;
@@ -21,6 +26,8 @@ interface ProfileProps {
 
 export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, onProfileUpdate }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [currentLoans, setCurrentLoans] = useState<Equipment[]>([]);
+  const [history, setHistory] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -43,18 +50,40 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
         const user = session?.user;
 
         if (user) {
-          const { data, error } = await supabase
+          // 1. Profil de base
+          const { data: profileData, error } = await supabase
             .from('profiles')
             .select('nom, prenom, avatar, matricule, email, grade, caserne')
             .eq('id', user.id)
             .single();
 
-          if (error) {
-            setFormData(prev => ({ ...prev, email: user.email || '' }));
+          if (!error) {
+            setProfile(profileData);
+            setFormData(profileData);
           } else {
-            setProfile(data);
-            setFormData(data);
+            setFormData(prev => ({ ...prev, email: user.email || '' }));
           }
+
+          // 2. Équipements en cours
+          const { data: loanData } = await supabase
+            .from('armoire_equipment')
+            .select('*')
+            .eq('assignedTo', user.id);
+          
+          if (loanData) setCurrentLoans(loanData);
+
+          // 3. Historique (jointure manuelle pour avoir les noms des EPI)
+          const { data: historyData } = await supabase
+            .from('armoire_transactions')
+            .select(`
+              *,
+              equipment:armoire_equipment(type, size)
+            `)
+            .eq('userId', user.id)
+            .order('timestamp', { ascending: false })
+            .limit(10);
+          
+          if (historyData) setHistory(historyData);
         }
       } catch (err) {
         console.error('Erreur inattendue:', err);
@@ -68,21 +97,6 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
     }
   }, [session]);
 
-  useEffect(() => {
-    if (isProfileIncomplete) {
-      setIsEditing(true);
-    }
-  }, [isProfileIncomplete]);
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
   };
@@ -95,21 +109,17 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${session.user.id}-${Math.random()}.${fileExt}`;
-      const filePath = `avatars/${fileName}`;
 
-      // Upload de l'image (On suppose que le bucket 'avatars' existe et est public)
       const { error: uploadError } = await supabase.storage
-        .from('banque image habillement') // On réutilise le bucket existant ou un nouveau
+        .from('banque image habillement')
         .upload(`profiles/${fileName}`, file);
 
       if (uploadError) throw uploadError;
 
-      // Récupération de l'URL publique
       const { data: { publicUrl } } = supabase.storage
         .from('banque image habillement')
         .getPublicUrl(`profiles/${fileName}`);
 
-      // Mise à jour immédiate du profil en base
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ avatar: publicUrl })
@@ -117,16 +127,13 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
 
       if (updateError) throw updateError;
 
-      // Mise à jour de l'état local
       setProfile(prev => prev ? { ...prev, avatar: publicUrl } : null);
       setFormData(prev => ({ ...prev, avatar: publicUrl }));
       
-      if (onProfileUpdate) {
-        onProfileUpdate();
-      }
+      if (onProfileUpdate) onProfileUpdate();
     } catch (error: any) {
       console.error('Erreur upload avatar:', error);
-      alert("Erreur lors de l'envoi de la photo. Vérifiez les permissions de stockage.");
+      alert("Erreur lors de l'envoi de la photo.");
     } finally {
       setUploadingAvatar(false);
     }
@@ -163,12 +170,10 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
       setProfile({ ...formData, email: user.email || null, avatar: profile?.avatar || null });
       setIsEditing(false);
       
-      if (onProfileUpdate) {
-        onProfileUpdate();
-      }
+      if (onProfileUpdate) onProfileUpdate();
     } catch (error: any) {
       console.error('Erreur lors de la mise à jour:', error);
-      alert('Erreur lors de la sauvegarde du profil : ' + error.message);
+      alert('Erreur lors de la sauvegarde du profil');
     } finally {
       setSaving(false);
     }
@@ -189,7 +194,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
     : 'Utilisateur';
 
   return (
-    <div className="p-6 pb-24 animate-fade-in relative">
+    <div className="p-6 pb-24 animate-fade-in relative max-w-md mx-auto">
        {isProfileIncomplete && (
          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-r-lg shadow-sm">
            <div className="flex items-start gap-3">
@@ -198,9 +203,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
              </div>
              <div>
                <p className="font-bold text-yellow-800">Profil incomplet</p>
-               <p className="text-sm text-yellow-700 mt-1">
-                 Veuillez compléter vos informations pour accéder à l'application.
-               </p>
+               <p className="text-sm text-yellow-700 mt-1">Veuillez compléter vos informations.</p>
              </div>
            </div>
          </div>
@@ -208,9 +211,27 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
 
        <header className="mb-8">
           <h1 className="text-2xl font-bold text-slate-900">Mon Profil</h1>
-          <p className="text-slate-500 text-sm">Compte personnel</p>
+          <p className="text-slate-500 text-sm">Gestion de mes équipements</p>
        </header>
 
+       {/* Section 1: Équipements en cours (AU DESSUS DU CARD PROFIL) */}
+       {currentLoans.length > 0 && (
+         <div className="mb-6 space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <Package className="w-3 h-3" /> Équipements en ma possession
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {currentLoans.map((item) => (
+                <div key={item.id} className="bg-fire-50 text-fire-700 border border-fire-100 px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-2 shadow-sm">
+                  <div className="w-1.5 h-1.5 rounded-full bg-fire-500 animate-pulse"></div>
+                  {item.type} <span className="opacity-50 font-normal">({item.size})</span>
+                </div>
+              ))}
+            </div>
+         </div>
+       )}
+
+       {/* Carte Profil principale */}
        <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 mb-6 flex flex-col items-center text-center">
           <div className="relative group cursor-pointer" onClick={handleAvatarClick}>
             {profile?.avatar ? (
@@ -229,14 +250,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
               {uploadingAvatar ? <Loader2 className="w-3 h-3 animate-spin" /> : <Camera className="w-3 h-3" />}
             </div>
             
-            <input 
-              type="file" 
-              ref={fileInputRef} 
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleFileChange} 
-              disabled={uploadingAvatar}
-            />
+            <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} disabled={uploadingAvatar} />
           </div>
           
           <h2 className="font-bold text-lg text-slate-800 mb-1 capitalize">{displayName}</h2>
@@ -253,37 +267,10 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
                <Mail className="w-3 h-3" />
                {profile?.email || session?.user.email}
             </div>
-            
-            <div className="flex gap-2 justify-center w-full flex-wrap">
-              {profile?.matricule && (
-                <div className="flex items-center gap-1.5 text-blue-600 text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-100 font-medium">
-                  <BadgeInfo className="w-3 h-3" />
-                  {profile.matricule}
-                </div>
-              )}
-              {profile?.caserne && (
-                <div className="flex items-center gap-1.5 text-slate-600 text-xs bg-slate-100 px-3 py-1 rounded-full border border-slate-200 font-medium">
-                  <Building2 className="w-3 h-3" />
-                  {profile.caserne}
-                </div>
-              )}
-            </div>
           </div>
        </div>
 
        <div className="space-y-3">
-         <div className="bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-               <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                 <Shield className="w-5 h-5" />
-               </div>
-               <div>
-                 <p className="text-sm font-bold text-slate-700">Rôle</p>
-                 <p className="text-xs text-slate-500">Authentifié</p>
-               </div>
-            </div>
-         </div>
-
          <button 
             onClick={() => setIsEditing(true)}
             className="w-full bg-white p-4 rounded-xl border border-slate-100 flex items-center justify-center gap-3 active:scale-[0.99] transition-transform hover:bg-slate-50 group"
@@ -299,19 +286,46 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
             </div>
             <ChevronRight className="w-4 h-4 text-slate-300" />
          </button>
+
+         {/* Section 2: Historique (SOUS LE BOUTON MODIFIER) */}
+         <div className="mt-8 space-y-4">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+              <History className="w-3 h-3" /> Historique récent
+            </h3>
+            
+            <div className="space-y-3">
+              {history.length > 0 ? history.map((trans) => (
+                <div key={trans.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center gap-3 shadow-sm">
+                  <div className={`p-2 rounded-lg ${trans.type === 'take' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                    {trans.type === 'take' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-800 truncate">
+                      {(trans as any).equipment?.type || 'Équipement'}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {new Date(trans.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <div className={`text-[10px] font-bold px-2 py-1 rounded-full ${trans.type === 'take' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    {trans.type === 'take' ? 'EMPRUNT' : 'RETOUR'}
+                  </div>
+                </div>
+              )) : (
+                <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl">
+                   <p className="text-xs text-slate-400">Aucun historique disponible</p>
+                </div>
+              )}
+            </div>
+         </div>
        </div>
 
        <button 
-         onClick={handleSignOut}
+         onClick={() => supabase.auth.signOut()}
          className="mt-8 w-full py-4 border border-red-100 bg-red-50 text-red-600 rounded-xl font-bold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform hover:bg-red-100"
        >
-         <LogOut className="w-4 h-4" />
-         Se déconnecter
+         <LogOut className="w-4 h-4" /> Se déconnecter
        </button>
-       
-       <p className="mt-6 text-[10px] text-slate-300 text-center font-mono">
-         UID: {session?.user.id.slice(0, 8)}...
-       </p>
 
        {isEditing && (
          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
@@ -319,88 +333,43 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
             <div className="bg-white w-full max-w-md rounded-t-3xl sm:rounded-2xl p-6 relative z-50 animate-slide-up shadow-2xl max-h-[90vh] overflow-y-auto">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-bold text-slate-900">Modifier le profil</h3>
-                <button onClick={() => !isProfileIncomplete && setIsEditing(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed" disabled={isProfileIncomplete}>
+                <button onClick={() => !isProfileIncomplete && setIsEditing(false)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200" disabled={isProfileIncomplete}>
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="space-y-4">
-                
-                <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Email</label>
-                  <div className="relative">
-                    <input 
-                      type="text" 
-                      value={formData.email || session?.user.email || ''}
-                      disabled
-                      className="w-full p-3 pl-10 bg-slate-100 rounded-xl border border-slate-200 text-sm text-slate-500 outline-none cursor-not-allowed"
-                    />
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">Prénom *</label>
-                    <input 
-                      type="text" 
-                      name="prenom"
-                      value={formData.prenom || ''}
-                      onChange={handleInputChange}
-                      className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
-                    />
+                    <input type="text" name="prenom" value={formData.prenom || ''} onChange={(e) => setFormData(prev => ({...prev, prenom: e.target.value}))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-500 mb-1">Nom *</label>
-                    <input 
-                      type="text" 
-                      name="nom"
-                      value={formData.nom || ''}
-                      onChange={handleInputChange}
-                      className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
-                    />
+                    <input type="text" name="nom" value={formData.nom || ''} onChange={(e) => setFormData(prev => ({...prev, nom: e.target.value}))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500" />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Matricule</label>
                   <div className="relative">
-                    <input 
-                      type="text" 
-                      name="matricule"
-                      value={formData.matricule || ''}
-                      onChange={handleInputChange}
-                      placeholder="SP-XXXX"
-                      className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono"
-                    />
+                    <input type="text" name="matricule" value={formData.matricule || ''} onChange={(e) => setFormData(prev => ({...prev, matricule: e.target.value}))} placeholder="SP-XXXX" className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500 font-mono" />
                     <BadgeInfo className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="block text-xs font-medium text-slate-500 mb-1">Caserne / Centre de Secours</label>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Caserne</label>
                   <div className="relative">
-                    <input 
-                      type="text" 
-                      name="caserne"
-                      value={formData.caserne || ''}
-                      onChange={handleInputChange}
-                      placeholder="Ex: CS Centre"
-                      className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
-                    />
+                    <input type="text" name="caserne" value={formData.caserne || ''} onChange={(e) => setFormData(prev => ({...prev, caserne: e.target.value}))} placeholder="CS Centre" className="w-full p-3 pl-10 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500" />
                     <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1">Grade *</label>
-                  <select 
-                    name="grade"
-                    value={formData.grade || ''}
-                    onChange={handleInputChange}
-                    className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500"
-                  >
-                    <option value="">Sélectionner un grade...</option>
+                  <select name="grade" value={formData.grade || ''} onChange={(e) => setFormData(prev => ({...prev, grade: e.target.value}))} className="w-full p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm outline-none focus:ring-2 focus:ring-fire-500" >
+                    <option value="">Sélectionner...</option>
                     <option value="Sapeur">Sapeur</option>
                     <option value="Caporal">Caporal</option>
                     <option value="Caporal-Chef">Caporal-Chef</option>
@@ -414,11 +383,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
                   </select>
                 </div>
 
-                <button 
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 mt-4 flex items-center justify-center gap-2 disabled:opacity-70 hover:bg-slate-800 transition-colors"
-                >
+                <button onClick={handleSave} disabled={saving} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold shadow-lg shadow-slate-200 mt-4 flex items-center justify-center gap-2 disabled:opacity-70 hover:bg-slate-800 transition-colors" >
                   {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Check className="w-5 h-5" />}
                   {saving ? 'Enregistrement...' : 'Enregistrer le profil'}
                 </button>
