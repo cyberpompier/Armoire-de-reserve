@@ -4,7 +4,8 @@ import { Session } from '@supabase/supabase-js';
 import { 
   LogOut, User as UserIcon, Shield, Mail, ChevronRight, 
   BadgeInfo, Star, X, Check, Loader2, Building2, 
-  AlertTriangle, Camera, Package, History, ArrowUpRight, ArrowDownLeft 
+  AlertTriangle, Camera, Package, History, ArrowUpRight, ArrowDownLeft,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Equipment, Transaction } from '../types';
 
@@ -29,6 +30,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
   const [currentLoans, setCurrentLoans] = useState<Equipment[]>([]);
   const [history, setHistory] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [isEditing, setIsEditing] = useState(false);
@@ -81,7 +83,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
             `)
             .eq('userId', user.id)
             .order('timestamp', { ascending: false })
-            .limit(10);
+            .limit(20);
           
           if (historyData) setHistory(historyData);
         }
@@ -193,6 +195,8 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
     ? `${profile.prenom || ''} ${profile.nom || ''}`.trim() 
     : 'Utilisateur';
 
+  const displayedHistory = showAllHistory ? history : history.slice(0, 3);
+
   return (
     <div className="p-6 pb-24 animate-fade-in relative max-w-md mx-auto">
        {isProfileIncomplete && (
@@ -214,7 +218,7 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
           <p className="text-slate-500 text-sm">Gestion de mes équipements</p>
        </header>
 
-       {/* Section 1: Équipements en cours (AU DESSUS DU CARD PROFIL) */}
+       {/* Section 1: Équipements en cours */}
        {currentLoans.length > 0 && (
          <div className="mb-6 space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
@@ -287,31 +291,48 @@ export const Profile: React.FC<ProfileProps> = ({ session, isProfileIncomplete, 
             <ChevronRight className="w-4 h-4 text-slate-300" />
          </button>
 
-         {/* Section 2: Historique (SOUS LE BOUTON MODIFIER) */}
+         {/* Section Historique */}
          <div className="mt-8 space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
               <History className="w-3 h-3" /> Historique récent
             </h3>
             
             <div className="space-y-3">
-              {history.length > 0 ? history.map((trans) => (
-                <div key={trans.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center gap-3 shadow-sm">
-                  <div className={`p-2 rounded-lg ${trans.type === 'take' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                    {trans.type === 'take' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">
-                      {(trans as any).equipment?.type || 'Équipement'}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      {new Date(trans.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <div className={`text-[10px] font-bold px-2 py-1 rounded-full ${trans.type === 'take' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                    {trans.type === 'take' ? 'EMPRUNT' : 'RETOUR'}
-                  </div>
-                </div>
-              )) : (
+              {history.length > 0 ? (
+                <>
+                  {displayedHistory.map((trans) => (
+                    <div key={trans.id} className="bg-white p-3 rounded-xl border border-slate-100 flex items-center gap-3 shadow-sm animate-in fade-in slide-in-from-top-2">
+                      <div className={`p-2 rounded-lg ${trans.type === 'take' ? 'bg-orange-50 text-orange-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                        {trans.type === 'take' ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownLeft className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-slate-800 truncate">
+                          {(trans as any).equipment?.type || 'Équipement'}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          {new Date(trans.timestamp).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <div className={`text-[10px] font-bold px-2 py-1 rounded-full ${trans.type === 'take' ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {trans.type === 'take' ? 'EMPRUNT' : 'RETOUR'}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {history.length > 3 && (
+                    <button 
+                      onClick={() => setShowAllHistory(!showAllHistory)}
+                      className="w-full py-2 text-xs font-bold text-slate-400 hover:text-slate-600 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      {showAllHistory ? (
+                        <>Voir moins <ChevronUp size={14} /></>
+                      ) : (
+                        <>Voir tout l'historique ({history.length}) <ChevronDown size={14} /></>
+                      )}
+                    </button>
+                  )}
+                </>
+              ) : (
                 <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-2xl">
                    <p className="text-xs text-slate-400">Aucun historique disponible</p>
                 </div>
