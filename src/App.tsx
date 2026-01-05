@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast'; 
 import { AppState, Equipment, Transaction, User, EquipmentType, EquipmentStatus } from './types';
 import { Dashboard } from './components/Dashboard';
 import { StockManager } from './components/StockManager';
 import { Profile } from './components/Profile';
 import { Login } from './components/Login';
-import { LayoutDashboard, PackageSearch, Settings, UserCircle } from 'lucide-react';
+import { LayoutDashboard, PackageSearch, Settings, UserCircle, Mail } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import { Session } from '@supabase/supabase-js';
 import { ToastProvider } from './components/ToastProvider';
 import { showSuccess, showError, showLoading, dismissToast } from './utils/toast';
+import { generateMailtoLink, sendTransactionNotification } from './services/notificationService';
 
 const INITIAL_STATE: AppState = { inventory: [], users: [], transactions: [] };
 
@@ -54,7 +56,6 @@ const App: React.FC = () => {
     const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
     
     if (data) {
-      // Un profil est incomplet si le nom, prénom ou grade est manquant
       if (!data.nom || !data.prenom || !data.grade) {
         setIsProfileIncomplete(true);
       } else {
@@ -65,7 +66,6 @@ const App: React.FC = () => {
         rank: data.grade || 'Sapeur', role: data.role || 'pompier'
       });
     } else {
-      // Si aucun profil n'existe, il est forcément incomplet
       setIsProfileIncomplete(true);
       setCurrentUser({ id: userId, email, name: 'Nouvel Utilisateur', rank: '', role: 'pompier' });
     }
@@ -122,7 +122,43 @@ const App: React.FC = () => {
       }));
       
       dismissToast(loadingToastId);
-      showSuccess("Opération réussie !");
+      
+      // Génération du lien mailto
+      const mailtoLink = generateMailtoLink(transactions, state.inventory, state.users, currentUser);
+
+      if (mailtoLink) {
+        // Tentative d'ouverture automatique (peut échouer selon le navigateur)
+        sendTransactionNotification(mailtoLink);
+
+        // Affichage d'un toast interactif PERSISTANT pour forcer l'ouverture manuellement
+        toast((t) => (
+          <div className="flex flex-col gap-3 min-w-[220px]">
+            <span className="font-bold text-sm">✅ Mouvement enregistré !</span>
+            <button 
+              onClick={() => {
+                sendTransactionNotification(mailtoLink);
+                toast.dismiss(t.id);
+              }}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-3 rounded-lg flex items-center gap-2 justify-center font-bold text-xs shadow-md active:scale-95 transition-all"
+            >
+              <Mail size={16} />
+              CLIQUEZ ICI POUR ENVOYER L'EMAIL
+            </button>
+            <p className="text-[10px] text-slate-500 italic text-center">
+              Si l'application mail ne s'ouvre pas,<br/>cliquez sur le bouton ci-dessus.
+            </p>
+            <button 
+               onClick={() => toast.dismiss(t.id)}
+               className="text-[10px] text-slate-400 hover:text-slate-600 underline text-center"
+            >
+              Fermer
+            </button>
+          </div>
+        ), { duration: Infinity });
+      } else {
+        showSuccess("Opération réussie !");
+      }
+
     } catch (error: any) {
       dismissToast(loadingToastId);
       showError(`Erreur: ${error.message}`);
@@ -145,7 +181,7 @@ const App: React.FC = () => {
 
       if (pairId) {
         await supabase.from('armoire_equipment').update({ pairId: newEquipment.id }).eq('id', pairId);
-        await fetchInitialData(); // Refresh all data to ensure consistency
+        await fetchInitialData(); 
       } else {
         setState(prev => ({ ...prev, inventory: [...prev.inventory, newEquipment as Equipment] }));
       }
@@ -177,7 +213,7 @@ const App: React.FC = () => {
         await supabase.from('armoire_equipment').update({ pairId: returnedItem.id }).eq('id', pairId);
       }
       
-      await fetchInitialData(); // Easiest way to sync state after complex update
+      await fetchInitialData(); 
       dismissToast(toastId);
       showSuccess("Équipement mis à jour.");
     } catch (error: any) {
@@ -188,7 +224,6 @@ const App: React.FC = () => {
   };
 
   const handleDeleteEquipment = async (itemId: string) => {
-    // This needs to be enhanced to handle un-pairing
     await supabase.from('armoire_equipment').delete().eq('id', itemId);
     await fetchInitialData();
     showSuccess("Équipement supprimé.");
@@ -197,7 +232,6 @@ const App: React.FC = () => {
   if (isLoadingData) return <div>Chargement...</div>;
   if (!session) return <Login />;
 
-  // Si le profil est incomplet, on affiche uniquement la page de profil
   if (isProfileIncomplete) {
     return (
       <div className="h-full w-full bg-slate-50 flex justify-center">
