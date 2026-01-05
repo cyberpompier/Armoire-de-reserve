@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppState, EquipmentStatus } from '../types';
+import { AppState, EquipmentStatus, EquipmentType } from '../types';
 import { ShieldAlert, Package, Activity, Sparkles, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react';
 import { analyzeStockStatus } from '../services/geminiService';
 
@@ -15,6 +15,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
   const loanedItems = state.inventory.filter(i => i.status === EquipmentStatus.LOANED).length;
   const damagedItems = state.inventory.filter(i => i.status === EquipmentStatus.DAMAGED).length;
   const availableItems = state.inventory.filter(i => i.status === EquipmentStatus.AVAILABLE).length;
+
+  // Calcul du stock par type
+  const stockByType = Object.values(EquipmentType).map(type => ({
+    type,
+    count: state.inventory.filter(i => i.type === type && i.status === EquipmentStatus.AVAILABLE).length
+  }));
+
+  const getIcon = (t: string) => {
+    switch (t) {
+      case EquipmentType.HELMET: return '⛑️';
+      case EquipmentType.JACKET: return '🧥';
+      case EquipmentType.TROUSERS: return '👖';
+      case EquipmentType.BOOTS: return '👢';
+      case EquipmentType.GLOVES: return '🧤';
+      case EquipmentType.BAG: return '🎒';
+      default: return '📦';
+    }
+  };
 
   // Get recent transactions sorted by date
   const recentTransactions = [...state.transactions]
@@ -58,6 +76,20 @@ export const Dashboard: React.FC<DashboardProps> = ({ state }) => {
           </div>
           <span className="text-2xl font-bold text-slate-800">{loanedItems}</span>
           <span className="text-xs text-slate-500 font-medium">Sortis</span>
+        </div>
+
+        {/* Détail par type */}
+        <div className="col-span-2">
+            <h3 className="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider ml-1">Détail Stock Disponible</h3>
+            <div className="grid grid-cols-3 gap-2">
+                {stockByType.map(item => (
+                    <div key={item.type} className="bg-white border border-slate-100 p-2 rounded-xl flex flex-col items-center justify-center shadow-sm">
+                        <span className="text-xl mb-1">{getIcon(item.type)}</span>
+                        <span className="text-[10px] font-bold text-slate-600 text-center leading-tight truncate w-full px-1 mb-1">{item.type}</span>
+                        <span className={`text-sm font-extrabold ${item.count > 0 ? 'text-green-600' : 'text-slate-300'}`}>{item.count}</span>
+                    </div>
+                ))}
+            </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center col-span-2">
