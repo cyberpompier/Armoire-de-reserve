@@ -6,11 +6,12 @@
     <title>FireStock - Gestion EPI</title>
     
     <!-- PWA Meta Tags -->
+    <link rel="manifest" href="/manifest.json" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="theme-color" content="#0f172a" />
     
-    <!-- Tailwind CSS (CDN kept for simplicity in this setup) -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -33,7 +34,6 @@
       }
     </script>
     <style>
-      /* Custom scrollbar hiding for clean mobile UI */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
       }
@@ -41,12 +41,11 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-      /* CRITICAL: Force full height for sticky footer layout */
       html, body, #root {
         height: 100%;
         margin: 0;
         padding: 0;
-        overflow: hidden; /* Prevent body scroll, only app container scrolls */
+        overflow: hidden;
       }
       body {
         background-color: #f8fafc;

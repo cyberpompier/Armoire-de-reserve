@@ -1,0 +1,23 @@
+{
+  "name": "FireStock - Gestion EPI",
+  "short_name": "FireStock",
+  "description": "Gestion des stocks d'EPI pour Sapeurs-Pompiers",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://quvdxjxszquqqcvesntn.supabase.co/storage/v1/object/public/banque%20image%20habillement/habillement/casque%20F1.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://quvdxjxszquqqcvesntn.supabase.co/storage/v1/object/public/banque%20image%20habillement/habillement/casque%20F1.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}
